@@ -312,8 +312,9 @@ func New(init map[string]uint64) (*VClock, error) {
 
 	}()
 
-	for key, val := range init {
-		if err := v.Set(key, val); err != nil {
+	keys := sortedKeys(init)
+	for _, key := range keys {
+		if err := v.Set(key, init[key]); err != nil {
 			return nil, v.Close()
 		}
 	}
