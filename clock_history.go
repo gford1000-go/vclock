@@ -102,7 +102,7 @@ func (h *history) getRange(from, to uint64) []map[string]uint64 {
 		return h.getRange(to, from)
 	}
 	ret := []map[string]uint64{}
-	for i := from; i < to; i++ {
+	for i := from; i <= to; i++ {
 		if i <= h.getLastId() {
 			ret = append(ret, copyMap(h.items[i].vc))
 		}

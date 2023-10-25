@@ -95,6 +95,7 @@ type VClock struct {
 	reqLastUpdate  chan bool
 	respLastUpdate chan *getter
 	reqMerge       chan map[string]uint64
+	reqPrune       chan bool
 	reqSnap        chan bool
 	respSnap       chan map[string]uint64
 	reqTick        chan string
@@ -115,6 +116,7 @@ func New(init map[string]uint64) (*VClock, error) {
 		reqLastUpdate:  make(chan bool),
 		respLastUpdate: make(chan *getter),
 		reqMerge:       make(chan map[string]uint64),
+		reqPrune:       make(chan bool),
 		reqSnap:        make(chan bool),
 		respSnap:       make(chan map[string]uint64),
 		reqTick:        make(chan string),
@@ -137,6 +139,7 @@ func New(init map[string]uint64) (*VClock, error) {
 			close(v.reqLastUpdate)
 			close(v.respLastUpdate)
 			close(v.reqMerge)
+			close(v.reqPrune)
 			close(v.reqSnap)
 			close(v.respSnap)
 			close(v.reqTick)
@@ -283,6 +286,11 @@ func New(init map[string]uint64) (*VClock, error) {
 				{
 					v.err <- history.apply(&event{merge: other})
 				}
+			case <-v.reqPrune:
+				{
+					history = newHistory(history.latest())
+					v.err <- nil
+				}
 			case p := <-v.setter:
 				{
 					v.err <- history.apply(&event{setter: p})
@@ -383,6 +391,11 @@ func (vc *VClock) Merge(other *VClock) error {
 	}
 
 	return attemptSendChan(vc.reqMerge, m, vc.err, errClosedVClock)
+}
+
+// Prune resets the clock history, so that only the latest is available
+func (vc *VClock) Prune() error {
+	return attemptSendChan(vc.reqPrune, true, vc.err, errClosedVClock)
 }
 
 // Bytes returns an encoded vector clock

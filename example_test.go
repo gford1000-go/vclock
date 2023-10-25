@@ -82,3 +82,32 @@ func ExampleNewShowingTick() {
 	fmt.Println(a)
 	// Output: map[a:4 b:5 c:5]
 }
+
+func ExampleGetHistory() {
+	c, _ := New(map[string]uint64{"x": 0, "y": 0})
+	defer c.Close()
+
+	c.Tick("x")
+	c.Tick("x")
+	c.Tick("y")
+	c.Tick("x")
+
+	history, _ := c.GetHistory()
+	fmt.Println(history)
+	// Output: [map[] map[x:0] map[x:0 y:0] map[x:1 y:0] map[x:2 y:0] map[x:2 y:1] map[x:3 y:1]]
+}
+
+func ExamplePrune() {
+	c, _ := New(map[string]uint64{"x": 0, "y": 0})
+	defer c.Close()
+
+	c.Tick("x")
+	c.Tick("x")
+	c.Tick("y")
+	c.Tick("x")
+
+	c.Prune()
+	history, _ := c.GetHistory()
+	fmt.Println(history)
+	// Output: [map[x:3 y:1]]
+}
