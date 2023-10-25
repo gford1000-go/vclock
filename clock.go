@@ -90,6 +90,8 @@ type VClock struct {
 	respComp       chan bool
 	reqGet         chan string
 	respGet        chan *getterWithStatus
+	reqHistory     chan bool
+	respHistory    chan []map[string]uint64
 	reqLastUpdate  chan bool
 	respLastUpdate chan *getter
 	reqMerge       chan map[string]uint64
@@ -108,6 +110,8 @@ func New(init map[string]uint64) (*VClock, error) {
 		respComp:       make(chan bool),
 		reqGet:         make(chan string),
 		respGet:        make(chan *getterWithStatus),
+		reqHistory:     make(chan bool),
+		respHistory:    make(chan []map[string]uint64),
 		reqLastUpdate:  make(chan bool),
 		respLastUpdate: make(chan *getter),
 		reqMerge:       make(chan map[string]uint64),
@@ -128,6 +132,8 @@ func New(init map[string]uint64) (*VClock, error) {
 			close(v.respComp)
 			close(v.reqGet)
 			close(v.respGet)
+			close(v.reqHistory)
+			close(v.respHistory)
 			close(v.reqLastUpdate)
 			close(v.respLastUpdate)
 			close(v.reqMerge)
@@ -137,7 +143,7 @@ func New(init map[string]uint64) (*VClock, error) {
 			close(v.setter)
 		}
 
-		var vc = make(map[string]uint64)
+		history := newHistory(map[string]uint64{})
 
 		for {
 			select {
@@ -147,6 +153,8 @@ func New(init map[string]uint64) (*VClock, error) {
 				return
 			case c := <-v.reqComp:
 				{
+					vc := history.latest()
+
 					// Compare takes another clock and determines if it is equal, an
 					// ancestor, descendant, or concurrent with the callees clock.
 
@@ -245,14 +253,22 @@ func New(init map[string]uint64) (*VClock, error) {
 				}
 			case id := <-v.reqGet:
 				{
+					vc := history.latest()
+
 					val, ok := vc[id]
 					g := &getterWithStatus{b: ok}
 					g.id = id
 					g.v = val
 					v.respGet <- g
 				}
+			case <-v.reqHistory:
+				{
+					v.respHistory <- history.getAll()
+				}
 			case <-v.reqLastUpdate:
 				{
+					vc := history.latest()
+
 					var id string = ""
 					var last uint64
 					for key := range vc {
@@ -265,49 +281,22 @@ func New(init map[string]uint64) (*VClock, error) {
 				}
 			case other := <-v.reqMerge:
 				{
-					for id := range other {
-						if _, ok := vc[id]; ok {
-							if vc[id] < other[id] {
-								vc[id] = other[id]
-							}
-						} else {
-							vc[id] = other[id]
-						}
-					}
-					v.err <- nil
-				}
-			case <-v.reqSnap:
-				{
-					m := map[string]uint64{}
-					for key, val := range vc {
-						m[key] = val
-					}
-					v.respSnap <- m
+					v.err <- history.apply(&event{merge: other})
 				}
 			case p := <-v.setter:
 				{
-					if len(p.id) == 0 {
-						v.err <- errClockIdMustNotBeEmptyString
-					} else {
-						if _, ok := vc[p.id]; !ok {
-							vc[p.id] = p.v
-							v.err <- nil
-						} else {
-							v.err <- errAttemptToSetExistingId
-						}
-					}
+					v.err <- history.apply(&event{setter: p})
+				}
+			case <-v.reqSnap:
+				{
+					v.respSnap <- history.latestWithCopy()
 				}
 			case id := <-v.reqTick:
 				{
 					if len(id) == 0 {
 						v.err <- errClockIdMustNotBeEmptyString
 					} else {
-						if _, ok := vc[id]; ok {
-							vc[id] += 1
-							v.err <- nil
-						} else {
-							v.err <- errAttemptToTickUnknownId
-						}
+						v.err <- history.apply(&event{tick: id})
 					}
 				}
 			}
@@ -355,6 +344,11 @@ func (vc *VClock) Get(id string) (uint64, bool) {
 // GetMap returns a copy of the complete vector clock map
 func (vc *VClock) GetMap() (map[string]uint64, error) {
 	return attemptSendChanWithResp(vc.reqSnap, true, vc.respSnap, errClosedVClock)
+}
+
+// GetHistory returns a copy of each state change of the vectory clock map
+func (vc *VClock) GetHistory() ([]map[string]uint64, error) {
+	return attemptSendChanWithResp(vc.reqHistory, true, vc.respHistory, errClosedVClock)
 }
 
 // Copy creates a new VClock instance, initialised to the
