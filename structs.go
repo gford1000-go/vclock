@@ -1,10 +1,16 @@
 package vclock
 
+import "fmt"
+
 // SetInfo stores the value to be applied to the vector clock
 // for the specified identifier.
 type SetInfo struct {
 	Id    string
 	Value uint64
+}
+
+func (s *SetInfo) String() string {
+	return fmt.Sprint(*s)
 }
 
 // copy returns a copy of the instance
@@ -14,6 +20,18 @@ func (s *SetInfo) copy() *SetInfo {
 
 // EventType describes the type of update within an Event
 type EventType uint
+
+func (e EventType) String() string {
+	switch e {
+	case Set:
+		return "Set"
+	case Tick:
+		return "Tick"
+	case Merge:
+		return "Merge"
+	}
+	return "Unknown"
+}
 
 const (
 	Set EventType = 1 << iota
@@ -28,6 +46,10 @@ type Event struct {
 	Set   *SetInfo
 	Tick  string
 	Merge map[string]uint64
+}
+
+func (e *Event) String() string {
+	return fmt.Sprint(*e)
 }
 
 // copy returns a deep copy of the instance
@@ -87,9 +109,17 @@ type HistoryItem struct {
 
 // copy returns a deep copy of the instance
 func (h *HistoryItem) copy() *HistoryItem {
-	return &HistoryItem{
+	hi := &HistoryItem{
 		HistoryId: h.HistoryId,
-		Change:    h.Change.copy(),
 		Clock:     copyMap(h.Clock),
 	}
+
+	if h.Change != nil {
+		hi.Change = h.Change.copy()
+	}
+	return hi
+}
+
+func (h *HistoryItem) String() string {
+	return fmt.Sprint(*h)
 }

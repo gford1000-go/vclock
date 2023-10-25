@@ -79,43 +79,47 @@ var errEnded = errors.New("ended clock")
 // VClock is an instance of a vector clock that can suppport
 // concurrent use across multiple goroutines
 type VClock struct {
-	end            chan bool
-	err            chan error
-	reqComp        chan *comp
-	respComp       chan bool
-	reqGet         chan string
-	respGet        chan *getterWithStatus
-	reqHistory     chan bool
-	respHistory    chan []map[string]uint64
-	reqLastUpdate  chan bool
-	respLastUpdate chan *getter
-	reqMerge       chan map[string]uint64
-	reqPrune       chan bool
-	reqSnap        chan bool
-	respSnap       chan map[string]uint64
-	reqTick        chan string
-	setter         chan *SetInfo
+	end             chan bool
+	err             chan error
+	reqComp         chan *comp
+	respComp        chan bool
+	reqFullHistory  chan bool
+	respFullHistory chan []*HistoryItem
+	reqGet          chan string
+	respGet         chan *getterWithStatus
+	reqHistory      chan bool
+	respHistory     chan []map[string]uint64
+	reqLastUpdate   chan bool
+	respLastUpdate  chan *getter
+	reqMerge        chan map[string]uint64
+	reqPrune        chan bool
+	reqSnap         chan bool
+	respSnap        chan map[string]uint64
+	reqTick         chan string
+	setter          chan *SetInfo
 }
 
 // New returns a VClock initialised with the specified pairs.
 func New(init map[string]uint64) (*VClock, error) {
 	v := &VClock{
-		end:            make(chan bool),
-		err:            make(chan error),
-		reqComp:        make(chan *comp),
-		respComp:       make(chan bool),
-		reqGet:         make(chan string),
-		respGet:        make(chan *getterWithStatus),
-		reqHistory:     make(chan bool),
-		respHistory:    make(chan []map[string]uint64),
-		reqLastUpdate:  make(chan bool),
-		respLastUpdate: make(chan *getter),
-		reqMerge:       make(chan map[string]uint64),
-		reqPrune:       make(chan bool),
-		reqSnap:        make(chan bool),
-		respSnap:       make(chan map[string]uint64),
-		reqTick:        make(chan string),
-		setter:         make(chan *SetInfo),
+		end:             make(chan bool),
+		err:             make(chan error),
+		reqComp:         make(chan *comp),
+		respComp:        make(chan bool),
+		reqFullHistory:  make(chan bool),
+		respFullHistory: make(chan []*HistoryItem),
+		reqGet:          make(chan string),
+		respGet:         make(chan *getterWithStatus),
+		reqHistory:      make(chan bool),
+		respHistory:     make(chan []map[string]uint64),
+		reqLastUpdate:   make(chan bool),
+		respLastUpdate:  make(chan *getter),
+		reqMerge:        make(chan map[string]uint64),
+		reqPrune:        make(chan bool),
+		reqSnap:         make(chan bool),
+		respSnap:        make(chan map[string]uint64),
+		reqTick:         make(chan string),
+		setter:          make(chan *SetInfo),
 	}
 
 	go func() {
@@ -127,6 +131,8 @@ func New(init map[string]uint64) (*VClock, error) {
 			close(v.end)
 			close(v.reqComp)
 			close(v.respComp)
+			close(v.reqFullHistory)
+			close(v.respFullHistory)
 			close(v.reqGet)
 			close(v.respGet)
 			close(v.reqHistory)
@@ -249,6 +255,10 @@ func New(init map[string]uint64) (*VClock, error) {
 						v.respComp <- c.cond&otherIs != 0
 					}
 				}
+			case <-v.reqFullHistory:
+				{
+					v.respFullHistory <- history.getFullAll()
+				}
 			case id := <-v.reqGet:
 				{
 					vc := history.latest()
@@ -350,7 +360,13 @@ func (vc *VClock) GetMap() (map[string]uint64, error) {
 	return attemptSendChanWithResp(vc.reqSnap, true, vc.respSnap, errClosedVClock)
 }
 
-// GetHistory returns a copy of each state change of the vectory clock map
+// GetFullHistory returns a copy of each state change of the vectory clock map,
+// including the Event detail of the change as well as new state of the clock
+func (vc *VClock) GetFullHistory() ([]*HistoryItem, error) {
+	return attemptSendChanWithResp(vc.reqFullHistory, true, vc.respFullHistory, errClosedVClock)
+}
+
+// GetHistory returns a copy of each state change of the vector clock map
 func (vc *VClock) GetHistory() ([]map[string]uint64, error) {
 	return attemptSendChanWithResp(vc.reqHistory, true, vc.respHistory, errClosedVClock)
 }

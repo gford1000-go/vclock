@@ -69,6 +69,25 @@ func (h *history) getAll() []map[string]uint64 {
 	return h.getRange(0, h.getLastId())
 }
 
+// getFullRange returns the specified range of history
+func (h *history) getFullRange(from, to uint64) []*HistoryItem {
+	if from > to {
+		return h.getFullRange(to, from)
+	}
+	ret := []*HistoryItem{}
+	for i := from; i <= to; i++ {
+		if i <= h.getLastId() {
+			ret = append(ret, h.items[i].copy())
+		}
+	}
+	return ret
+}
+
+// getFullAll returns all of the history
+func (h *history) getFullAll() []*HistoryItem {
+	return h.getFullRange(0, h.getLastId())
+}
+
 // newHistory initialises an instance of history
 func newHistory(m map[string]uint64) *history {
 	return &history{

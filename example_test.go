@@ -97,6 +97,27 @@ func ExampleGetHistory() {
 	// Output: [map[] map[x:0] map[x:0 y:0] map[x:1 y:0] map[x:2 y:0] map[x:2 y:1] map[x:3 y:1]]
 }
 
+func ExampleGetFullHistory() {
+	c1, _ := New(map[string]uint64{"x": 0, "y": 0})
+	defer c1.Close()
+
+	c1.Tick("x")
+	c1.Tick("x")
+	c1.Tick("y")
+	c1.Tick("x")
+
+	// Show all possible Event types by merging another clock
+	c2, _ := New(map[string]uint64{"z": 7})
+	defer c2.Close()
+	c1.Merge(c2)
+
+	// This is quite confusing when printed, but illustrates the availability of detailed history information
+	history, _ := c1.GetFullHistory()
+
+	fmt.Println(history)
+	// Output: [{0 <nil> map[]} {1 {Set {x 0}  map[]} map[x:0]} {2 {Set {y 0}  map[]} map[x:0 y:0]} {3 {Tick <nil> x map[]} map[x:1 y:0]} {4 {Tick <nil> x map[]} map[x:2 y:0]} {5 {Tick <nil> y map[]} map[x:2 y:1]} {6 {Tick <nil> x map[]} map[x:3 y:1]} {7 {Merge <nil>  map[z:7]} map[x:3 y:1 z:7]}]
+}
+
 func ExamplePrune() {
 	c, _ := New(map[string]uint64{"x": 0, "y": 0})
 	defer c.Close()
