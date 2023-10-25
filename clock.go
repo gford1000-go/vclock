@@ -69,11 +69,6 @@ type getterWithStatus struct {
 	b bool
 }
 
-type setter struct {
-	id string
-	v  uint64
-}
-
 var errClockIdMustNotBeEmptyString = errors.New("clock identifier must not be empty string")
 var errAttemptToSetExistingId = errors.New("clock identifier cannot be reset once initialised")
 var errAttemptToTickUnknownId = errors.New("attempted to tick unknown clock identifier")
@@ -99,7 +94,7 @@ type VClock struct {
 	reqSnap        chan bool
 	respSnap       chan map[string]uint64
 	reqTick        chan string
-	setter         chan *setter
+	setter         chan *SetInfo
 }
 
 // New returns a VClock initialised with the specified pairs.
@@ -120,7 +115,7 @@ func New(init map[string]uint64) (*VClock, error) {
 		reqSnap:        make(chan bool),
 		respSnap:       make(chan map[string]uint64),
 		reqTick:        make(chan string),
-		setter:         make(chan *setter),
+		setter:         make(chan *SetInfo),
 	}
 
 	go func() {
@@ -284,7 +279,7 @@ func New(init map[string]uint64) (*VClock, error) {
 				}
 			case other := <-v.reqMerge:
 				{
-					v.err <- history.apply(&event{merge: other})
+					v.err <- history.apply(&Event{Type: Merge, Merge: other})
 				}
 			case <-v.reqPrune:
 				{
@@ -293,7 +288,7 @@ func New(init map[string]uint64) (*VClock, error) {
 				}
 			case p := <-v.setter:
 				{
-					v.err <- history.apply(&event{setter: p})
+					v.err <- history.apply(&Event{Type: Set, Set: p})
 				}
 			case <-v.reqSnap:
 				{
@@ -304,7 +299,7 @@ func New(init map[string]uint64) (*VClock, error) {
 					if len(id) == 0 {
 						v.err <- errClockIdMustNotBeEmptyString
 					} else {
-						v.err <- history.apply(&event{tick: id})
+						v.err <- history.apply(&Event{Type: Tick, Tick: id})
 					}
 				}
 			}
@@ -331,7 +326,7 @@ func (vc *VClock) Close() error {
 // The identifier must not be an empty string, nor can an
 // identifier be set more than once
 func (vc *VClock) Set(id string, v uint64) error {
-	return attemptSendChan(vc.setter, &setter{id: id, v: v}, vc.err, errClosedVClock)
+	return attemptSendChan(vc.setter, &SetInfo{Id: id, Value: v}, vc.err, errClosedVClock)
 }
 
 // Tick increments the clock with the specified identifier.

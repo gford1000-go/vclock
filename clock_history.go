@@ -9,60 +9,14 @@ func copyMap[T comparable, U any](m map[T]U) map[T]U {
 	return newm
 }
 
-// event updates the vector clock
-type event struct {
-	setter *setter
-	tick   string
-	merge  map[string]uint64
-}
-
-// apply attempts to assign the change to the supplied map
-func (e *event) apply(m map[string]uint64) error {
-	if e.setter != nil {
-		if len(e.setter.id) == 0 {
-			return errClockIdMustNotBeEmptyString
-		} else {
-			if _, ok := m[e.setter.id]; !ok {
-				m[e.setter.id] = e.setter.v
-			} else {
-				return errAttemptToSetExistingId
-			}
-		}
-	} else if len(e.tick) > 0 {
-		if _, ok := m[e.tick]; ok {
-			m[e.tick] += 1
-		} else {
-			return errAttemptToTickUnknownId
-		}
-	} else if e.merge != nil {
-		for id := range e.merge {
-			if _, ok := m[id]; ok {
-				if m[id] < e.merge[id] {
-					m[id] = e.merge[id]
-				}
-			} else {
-				m[id] = e.merge[id]
-			}
-		}
-	}
-	return nil
-}
-
-// item records the new state after an event is applied
-type item struct {
-	id    uint64
-	event *event
-	vc    map[string]uint64
-}
-
 // history records all historic events (subject to pruning)
 type history struct {
 	lastId uint64
-	items  []*item
+	items  []*HistoryItem
 }
 
 // apply attempts to extend the history by applying the event
-func (h *history) apply(event *event) error {
+func (h *history) apply(event *Event) error {
 	vc := h.latestWithCopy()
 	if err := event.apply(vc); err != nil {
 		return err
@@ -70,10 +24,10 @@ func (h *history) apply(event *event) error {
 
 	nextId := h.getLastId() + 1
 
-	item := &item{
-		id:    nextId,
-		event: event,
-		vc:    vc,
+	item := &HistoryItem{
+		HistoryId: nextId,
+		Change:    event,
+		Clock:     vc,
 	}
 
 	h.items = append(h.items, item)
@@ -83,7 +37,7 @@ func (h *history) apply(event *event) error {
 
 // latest returns the current clock value
 func (h *history) latest() map[string]uint64 {
-	return h.items[h.getLastId()].vc
+	return h.items[h.getLastId()].Clock
 }
 
 // latestWithCopy returns a copy of the current clock value
@@ -104,7 +58,7 @@ func (h *history) getRange(from, to uint64) []map[string]uint64 {
 	ret := []map[string]uint64{}
 	for i := from; i <= to; i++ {
 		if i <= h.getLastId() {
-			ret = append(ret, copyMap(h.items[i].vc))
+			ret = append(ret, copyMap(h.items[i].Clock))
 		}
 	}
 	return ret
@@ -119,11 +73,11 @@ func (h *history) getAll() []map[string]uint64 {
 func newHistory(m map[string]uint64) *history {
 	return &history{
 		lastId: 0,
-		items: []*item{
+		items: []*HistoryItem{
 			{
-				id:    0,
-				event: nil,
-				vc:    copyMap(m),
+				HistoryId: 0,
+				Change:    nil,
+				Clock:     copyMap(m),
 			},
 		},
 	}
