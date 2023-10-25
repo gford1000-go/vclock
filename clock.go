@@ -125,11 +125,11 @@ func New(init map[string]uint64) (*VClock, error) {
 
 	go func() {
 		defer func() {
-			close(v.end)
 			close(v.err)
 		}()
 
 		closer := func() {
+			close(v.end)
 			close(v.reqComp)
 			close(v.respComp)
 			close(v.reqGet)
