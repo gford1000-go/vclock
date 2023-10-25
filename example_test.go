@@ -37,27 +37,32 @@ func ExampleNewShowingTick() {
 
 	newF := func(m map[string]uint64) *VClock { vc, _ := New(m); return vc }
 
+	// process emulates an autonomous process with a globally unique identifier
 	type process struct {
 		id string
 		vc *VClock
 	}
 
-	// Emulates sending a vector clock as part of an event moving between processes
-	send := func(from *process) []byte {
-		from.vc.Tick(from.id)
-		b, _ := from.vc.Bytes()
-		return b
-	}
+	// Transmit is the sending and receipt of an event between processes
+	transfer := func(from, to *process) {
 
-	// Emulates receiving a vector clock as part of an event moving between processes
-	recv := func(to *process, b []byte) {
-		to.vc.Tick(to.id)
-		vc, _ := FromBytes(b)
-		to.vc.Merge(vc)
-	}
+		// Emulates sending a vector clock as part of an event moving between processes
+		send := func(from *process) []byte {
+			from.vc.Tick(from.id)
+			b, _ := from.vc.Bytes()
+			return b
+		}
 
-	// Transmit is the sending and receipt
-	transfer := func(from, to *process) { recv(to, send(from)) }
+		// Emulates receiving a vector clock as part of an event moving between processes
+		recv := func(to *process, b []byte) {
+			to.vc.Tick(to.id)
+			vc, _ := FromBytes(b)
+			to.vc.Merge(vc)
+		}
+
+		// Perform the transfer
+		recv(to, send(from))
+	}
 
 	// The three processes of the example
 	var A *process = &process{id: "a", vc: newF(map[string]uint64{"a": 0})}
