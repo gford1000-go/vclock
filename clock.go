@@ -2,8 +2,10 @@ package vclock
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/gob"
 	"errors"
+	"sort"
 )
 
 // attemptSendChan will stop the panic and return recoverErr, should the chan be closed
@@ -28,21 +30,33 @@ func attemptSendChanWithResp[T interface{}, U interface{}](c chan T, i T, r chan
 	return <-r, nil
 }
 
-// Condition constants define how to compare a vector clock against another,
+// sortedKeys returns a sorted slice of the map's keys
+func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
+	keys := make([]K, len(m))
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
+
+// condition constants define how to compare a vector clock against another,
 // and may be ORed together when being provided to the Compare method.
-type Condition int
+type condition int
 
 // Constants define compairison conditions between pairs of vector clocks
 const (
-	Equal Condition = 1 << iota
-	Ancestor
-	Descendant
-	Concurrent
+	equal      condition = 1 << iota // Clocks are identical
+	ancestor                         // One clock is a clear ancestor to the other
+	descendant                       // One clock is a clear descendent to the other
+	concurrent                       // Clocks are completely independent, or partial overlap
 )
 
 type comp struct {
 	other map[string]uint64
-	cond  Condition
+	cond  condition
 }
 
 type getter struct {
@@ -133,73 +147,101 @@ func New(init map[string]uint64) (*VClock, error) {
 				return
 			case c := <-v.reqComp:
 				{
-					// Compare takes another clock and determines if it is Equal, an
-					// Ancestor, Descendant, or Concurrent with the callees clock.
+					// Compare takes another clock and determines if it is equal, an
+					// ancestor, descendant, or concurrent with the callees clock.
 
-					var otherIs Condition
+					var otherIs condition
 					// Preliminary qualification based on length
 					if len(vc) > len(c.other) {
-						if c.cond&(Ancestor|Concurrent) == 0 {
+						if c.cond&(ancestor|concurrent) == 0 {
 							v.respComp <- false
 							continue
 						}
-						otherIs = Ancestor
+						otherIs = ancestor
 					} else if len(vc) < len(c.other) {
-						if c.cond&(Descendant|Concurrent) == 0 {
+						if c.cond&(descendant|concurrent) == 0 {
 							v.respComp <- false
 							continue
 						}
-						otherIs = Descendant
+						otherIs = descendant
 					} else {
-						otherIs = Equal
+						otherIs = equal
 					}
 
-					// Compare matching items
 					applyTest := true
-					for id := range c.other {
+
+					keys := sortedKeys(vc)
+					otherKeys := sortedKeys(c.other)
+
+					if c.cond&(equal|descendant) != 0 {
+						// All of the identifiers in this clock must be present in the other
+						for _, key := range keys {
+							if _, ok := c.other[key]; !ok {
+								v.respComp <- false
+								applyTest = false
+								goto checkContinue
+							}
+						}
+					}
+					if c.cond&(equal|ancestor) != 0 {
+						// All of the identifiers in this clock must be present in the other
+						for _, key := range otherKeys {
+							if _, ok := vc[key]; !ok {
+								v.respComp <- false
+								applyTest = false
+								goto checkContinue
+							}
+						}
+					}
+
+					// Compare matching items, using sortedKeys to provide
+					// deterministic (sorted) comparison of lock identifiers
+					for _, id := range otherKeys {
 						if _, found := vc[id]; found {
 							if c.other[id] > vc[id] {
 								switch otherIs {
-								case Equal:
-									if c.cond&Descendant == 0 {
+								case equal:
+									if c.cond&descendant == 0 {
 										v.respComp <- false
 										applyTest = false
 										goto checkContinue
 									}
-									otherIs = Descendant
-								case Ancestor:
-									v.respComp <- c.cond&Concurrent != 0
+									otherIs = descendant
+								case ancestor:
+									v.respComp <- c.cond&concurrent != 0
 									applyTest = false
+									goto checkContinue
 								}
 							} else if c.other[id] < vc[id] {
 								switch otherIs {
-								case Equal:
-									if c.cond&Ancestor == 0 {
+								case equal:
+									if c.cond&ancestor == 0 {
 										v.respComp <- false
 										applyTest = false
 										goto checkContinue
 									}
-									otherIs = Ancestor
-								case Descendant:
-									v.respComp <- c.cond&Concurrent != 0
+									otherIs = ancestor
+								case descendant:
+									v.respComp <- c.cond&concurrent != 0
 									applyTest = false
+									goto checkContinue
 								}
 							}
 						} else {
-							if otherIs == Equal {
-								v.respComp <- c.cond&Concurrent != 0
+							if otherIs == equal {
+								v.respComp <- c.cond&concurrent != 0
 								applyTest = false
 							} else if (len(c.other) - len(vc) - 1) < 0 {
-								v.respComp <- c.cond&Concurrent != 0
 								applyTest = false
+								v.respComp <- c.cond&concurrent != 0
 							}
+							goto checkContinue
 						}
 					}
 				checkContinue:
-					if !applyTest {
-						break
+					if applyTest {
+						v.respComp <- c.cond&otherIs != 0
 					}
-					v.respComp <- c.cond&otherIs != 0
 				}
 			case id := <-v.reqGet:
 				{
@@ -379,7 +421,7 @@ func FromBytes(data []byte) (vc *VClock, err error) {
 
 // Compare takes another clock and determines if it is Equal, an
 // Ancestor, Descendant, or Concurrent with the callees clock.
-func (vc *VClock) Compare(other *VClock, cond Condition) (bool, error) {
+func (vc *VClock) compare(other *VClock, cond condition) (bool, error) {
 	if other == nil {
 		return false, errClockMustNotBeNil
 	}
@@ -390,4 +432,37 @@ func (vc *VClock) Compare(other *VClock, cond Condition) (bool, error) {
 	}
 
 	return attemptSendChanWithResp(vc.reqComp, &comp{other: m, cond: cond}, vc.respComp, errClosedVClock)
+}
+
+// Equal returns true if the contents of the other clock
+// exactly match this instance.
+func (vc *VClock) Equal(other *VClock) (bool, error) {
+	return vc.compare(other, equal)
+}
+
+// Concurrent returns true if the contents of the other clock
+// are either completely or partially distinct.  Where partially
+// distinct, matching identifiers in the clocks must have the same value.
+func (vc *VClock) Concurrent(other *VClock) (bool, error) {
+	return vc.compare(other, concurrent)
+}
+
+// DescendsFrom returns true if the contents of the other clock shows
+// that it can have descended from this clock instance.  This means
+// that this clock's identifiers must all be present in the other clock,
+// and that this clock's identifier values must all be the same or
+// less than their value in the other clock, with at least one
+// identifier's value being less.
+func (vc *VClock) DescendsFrom(other *VClock) (bool, error) {
+	return vc.compare(other, descendant)
+}
+
+// AncestorOf returns true if the contents of this clock instance shows
+// that it can have descended from the other clock instance.  This means
+// that the other clock's identifiers must all be present in the this clock,
+// and that the other clock's identifier values must all be the same or
+// less than their value in this clock, with at least one of the other clock's
+// identifier's value being less.
+func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
+	return vc.compare(other, ancestor)
 }

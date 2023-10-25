@@ -606,3 +606,1059 @@ func TestLastUpdateClosed(t *testing.T) {
 
 	last(v1, "", 0)
 }
+
+func TestEqualSame(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestEqualClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	v1.Close()
+
+	_, err = v1.Equal(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestEqualOtherClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	v2.Close()
+
+	_, err = v1.Equal(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestEqualOtherClockNil(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	_, err = v1.Equal(nil)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClockMustNotBeNil {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestEqualConcurrentClocks(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"c": 1, "d": 14}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("unreleated vector clocks are compared as equal")
+	}
+}
+
+func TestEqualClocksOverlapping(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "c": 14}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("unreleated vector clocks are compared as equal")
+	}
+}
+
+func TestEqualDescendent(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("unreleated vector clocks are compared as equal")
+	}
+}
+
+func TestEqualAncestor1(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 0}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("unreleated vector clocks are compared as equal")
+	}
+}
+
+func TestEqualAncestor2(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Equal(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("unreleated vector clocks are compared as equal")
+	}
+}
+
+func TestConcurrentSame(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestConcurrent1(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"c": 2, "d": 12}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestConcurrent2(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "d": 12}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestConcurrent3(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "d": 12}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestConcurrent4(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestConcurrent5(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 14, "c": 2}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestConcurrent6(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 14, "c": 2, "d": 1, "e": 54}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.Concurrent(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestConcurrentClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	v1.Close()
+
+	_, err = v1.Concurrent(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestConcurrentOtherClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	v2.Close()
+
+	_, err = v1.Concurrent(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestConcurrentOtherClockNil(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	_, err = v1.Concurrent(nil)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClockMustNotBeNil {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestDescendsFromSame(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom1(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"c": 8, "d": 11}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom2(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "d": 11}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom3(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "d": 11}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom4(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom5(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "b": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom6(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "b": 14}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestDescendsFrom7(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "b": 14, "c": 2}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestDescendsFrom8(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "b": 15}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestDescendsFrom9(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 15}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestDescendsFrom10(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 1, "b": 15, "c": 3, "d": 7}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if !result {
+		t.Fatal("expected equality (true) but false returned")
+	}
+}
+
+func TestDescendsFrom11(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 0, "b": 14}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom12(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 0, "b": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom13(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 0, "c": 13}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom14(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 0, "c": 13, "d": 17}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFrom15(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	init2 := map[string]uint64{"a": 2, "c": 13, "d": 17}
+	v2, err := New(init2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.DescendsFrom(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestDescendsFromClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	v1.Close()
+
+	_, err = v1.DescendsFrom(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestDescendsFromOtherClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	v2.Close()
+
+	_, err = v1.DescendsFrom(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestDescendsFromOtherClockNil(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	_, err = v1.DescendsFrom(nil)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClockMustNotBeNil {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestAncestorOfSame(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	result, err := v1.AncestorOf(v2)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	if result {
+		t.Fatal("expected inequality (false) but true returned")
+	}
+}
+
+func TestAncestorOfClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v2.Close()
+
+	v1.Close()
+
+	_, err = v1.AncestorOf(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestAncestorOfOtherClockClosed(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	v2, err := v1.Copy()
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	v2.Close()
+
+	_, err = v1.AncestorOf(v2)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClosedVClock {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
+
+func TestAncestorOfOtherClockNil(t *testing.T) {
+
+	init1 := map[string]uint64{"a": 1, "b": 14}
+	v1, err := New(init1)
+	if err != nil {
+		t.Fatalf("unexpected error %q\n", err.Error())
+	}
+	defer v1.Close()
+
+	_, err = v1.AncestorOf(nil)
+	if err == nil {
+		t.Fatal("unexpected success when error expected")
+	} else {
+		if err != errClockMustNotBeNil {
+			t.Fatalf("unexpected error %q\n", err.Error())
+		}
+	}
+}
