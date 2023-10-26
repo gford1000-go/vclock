@@ -42,23 +42,6 @@ func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 	return keys
 }
 
-// condition constants define how to compare a vector clock against another,
-// and may be ORed together when being provided to the Compare method.
-type condition int
-
-// Constants define compairison conditions between pairs of vector clocks
-const (
-	equal      condition = 1 << iota // Clocks are identical
-	ancestor                         // One clock is a clear ancestor to the other
-	descendant                       // One clock is a clear descendent to the other
-	concurrent                       // Clocks are completely independent, or partial overlap
-)
-
-type comp struct {
-	other map[string]uint64
-	cond  condition
-}
-
 type getter struct {
 	id string
 	v  uint64
@@ -347,103 +330,7 @@ func clockLoop(v *VClock, maintainHistory bool) {
 			return
 		case c := <-v.reqComp:
 			{
-				vc := history.latest()
-
-				// Compare takes another clock and determines if it is equal, an
-				// ancestor, descendant, or concurrent with the callees clock.
-
-				var otherIs condition
-				// Preliminary qualification based on length
-				if len(vc) > len(c.other) {
-					if c.cond&(ancestor|concurrent) == 0 {
-						v.respComp <- false
-						continue
-					}
-					otherIs = ancestor
-				} else if len(vc) < len(c.other) {
-					if c.cond&(descendant|concurrent) == 0 {
-						v.respComp <- false
-						continue
-					}
-					otherIs = descendant
-				} else {
-					otherIs = equal
-				}
-
-				applyTest := true
-
-				keys := sortedKeys(vc)
-				otherKeys := sortedKeys(c.other)
-
-				if c.cond&(equal|descendant) != 0 {
-					// All of the identifiers in this clock must be present in the other
-					for _, key := range keys {
-						if _, ok := c.other[key]; !ok {
-							v.respComp <- false
-							applyTest = false
-							goto checkContinue
-						}
-					}
-				}
-				if c.cond&(equal|ancestor) != 0 {
-					// All of the identifiers in this clock must be present in the other
-					for _, key := range otherKeys {
-						if _, ok := vc[key]; !ok {
-							v.respComp <- false
-							applyTest = false
-							goto checkContinue
-						}
-					}
-				}
-
-				// Compare matching items, using sortedKeys to provide
-				// deterministic (sorted) comparison of lock identifiers
-				for _, id := range otherKeys {
-					if _, found := vc[id]; found {
-						if c.other[id] > vc[id] {
-							switch otherIs {
-							case equal:
-								if c.cond&descendant == 0 {
-									v.respComp <- false
-									applyTest = false
-									goto checkContinue
-								}
-								otherIs = descendant
-							case ancestor:
-								v.respComp <- c.cond&concurrent != 0
-								applyTest = false
-								goto checkContinue
-							}
-						} else if c.other[id] < vc[id] {
-							switch otherIs {
-							case equal:
-								if c.cond&ancestor == 0 {
-									v.respComp <- false
-									applyTest = false
-									goto checkContinue
-								}
-								otherIs = ancestor
-							case descendant:
-								v.respComp <- c.cond&concurrent != 0
-								applyTest = false
-								goto checkContinue
-							}
-						}
-					} else {
-						if otherIs == equal {
-							v.respComp <- c.cond&concurrent != 0
-							applyTest = false
-						} else if (len(c.other) - len(vc) - 1) < 0 {
-							applyTest = false
-							v.respComp <- c.cond&concurrent != 0
-						}
-						goto checkContinue
-					}
-				}
-			checkContinue:
-				if applyTest {
-					v.respComp <- c.cond&otherIs != 0
-				}
+				v.respComp <- compare(history.latest(), c.other, c.cond)
 			}
 		case <-v.reqFullHistory:
 			{
