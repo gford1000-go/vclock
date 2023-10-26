@@ -99,232 +99,16 @@ type VClock struct {
 	setter          chan *SetInfo
 }
 
-// New returns a VClock initialised with the specified pairs.
+// New returns a VClock initialised with the specified pairs,
+// which does not maintain any history.
 func New(init map[string]uint64) (*VClock, error) {
-	v := &VClock{
-		end:             make(chan bool),
-		err:             make(chan error),
-		reqComp:         make(chan *comp),
-		respComp:        make(chan bool),
-		reqFullHistory:  make(chan bool),
-		respFullHistory: make(chan []*HistoryItem),
-		reqGet:          make(chan string),
-		respGet:         make(chan *getterWithStatus),
-		reqHistory:      make(chan bool),
-		respHistory:     make(chan []map[string]uint64),
-		reqLastUpdate:   make(chan bool),
-		respLastUpdate:  make(chan *getter),
-		reqMerge:        make(chan map[string]uint64),
-		reqPrune:        make(chan bool),
-		reqSnap:         make(chan bool),
-		respSnap:        make(chan map[string]uint64),
-		reqTick:         make(chan string),
-		setter:          make(chan *SetInfo),
-	}
+	return newClock(init, false)
+}
 
-	go func() {
-		defer func() {
-			close(v.err)
-		}()
-
-		closer := func() {
-			close(v.end)
-			close(v.reqComp)
-			close(v.respComp)
-			close(v.reqFullHistory)
-			close(v.respFullHistory)
-			close(v.reqGet)
-			close(v.respGet)
-			close(v.reqHistory)
-			close(v.respHistory)
-			close(v.reqLastUpdate)
-			close(v.respLastUpdate)
-			close(v.reqMerge)
-			close(v.reqPrune)
-			close(v.reqSnap)
-			close(v.respSnap)
-			close(v.reqTick)
-			close(v.setter)
-		}
-
-		history := newHistory(map[string]uint64{})
-
-		for {
-			select {
-			case <-v.end:
-				closer() // Prevent any further attempts to make requests
-				v.err <- errEnded
-				return
-			case c := <-v.reqComp:
-				{
-					vc := history.latest()
-
-					// Compare takes another clock and determines if it is equal, an
-					// ancestor, descendant, or concurrent with the callees clock.
-
-					var otherIs condition
-					// Preliminary qualification based on length
-					if len(vc) > len(c.other) {
-						if c.cond&(ancestor|concurrent) == 0 {
-							v.respComp <- false
-							continue
-						}
-						otherIs = ancestor
-					} else if len(vc) < len(c.other) {
-						if c.cond&(descendant|concurrent) == 0 {
-							v.respComp <- false
-							continue
-						}
-						otherIs = descendant
-					} else {
-						otherIs = equal
-					}
-
-					applyTest := true
-
-					keys := sortedKeys(vc)
-					otherKeys := sortedKeys(c.other)
-
-					if c.cond&(equal|descendant) != 0 {
-						// All of the identifiers in this clock must be present in the other
-						for _, key := range keys {
-							if _, ok := c.other[key]; !ok {
-								v.respComp <- false
-								applyTest = false
-								goto checkContinue
-							}
-						}
-					}
-					if c.cond&(equal|ancestor) != 0 {
-						// All of the identifiers in this clock must be present in the other
-						for _, key := range otherKeys {
-							if _, ok := vc[key]; !ok {
-								v.respComp <- false
-								applyTest = false
-								goto checkContinue
-							}
-						}
-					}
-
-					// Compare matching items, using sortedKeys to provide
-					// deterministic (sorted) comparison of lock identifiers
-					for _, id := range otherKeys {
-						if _, found := vc[id]; found {
-							if c.other[id] > vc[id] {
-								switch otherIs {
-								case equal:
-									if c.cond&descendant == 0 {
-										v.respComp <- false
-										applyTest = false
-										goto checkContinue
-									}
-									otherIs = descendant
-								case ancestor:
-									v.respComp <- c.cond&concurrent != 0
-									applyTest = false
-									goto checkContinue
-								}
-							} else if c.other[id] < vc[id] {
-								switch otherIs {
-								case equal:
-									if c.cond&ancestor == 0 {
-										v.respComp <- false
-										applyTest = false
-										goto checkContinue
-									}
-									otherIs = ancestor
-								case descendant:
-									v.respComp <- c.cond&concurrent != 0
-									applyTest = false
-									goto checkContinue
-								}
-							}
-						} else {
-							if otherIs == equal {
-								v.respComp <- c.cond&concurrent != 0
-								applyTest = false
-							} else if (len(c.other) - len(vc) - 1) < 0 {
-								applyTest = false
-								v.respComp <- c.cond&concurrent != 0
-							}
-							goto checkContinue
-						}
-					}
-				checkContinue:
-					if applyTest {
-						v.respComp <- c.cond&otherIs != 0
-					}
-				}
-			case <-v.reqFullHistory:
-				{
-					v.respFullHistory <- history.getFullAll()
-				}
-			case id := <-v.reqGet:
-				{
-					vc := history.latest()
-
-					val, ok := vc[id]
-					g := &getterWithStatus{b: ok}
-					g.id = id
-					g.v = val
-					v.respGet <- g
-				}
-			case <-v.reqHistory:
-				{
-					v.respHistory <- history.getAll()
-				}
-			case <-v.reqLastUpdate:
-				{
-					vc := history.latest()
-
-					var id string = ""
-					var last uint64
-					for key := range vc {
-						if vc[key] > last {
-							id = key
-							last = vc[key]
-						}
-					}
-					v.respLastUpdate <- &getter{id: id, v: last}
-				}
-			case other := <-v.reqMerge:
-				{
-					v.err <- history.apply(&Event{Type: Merge, Merge: other})
-				}
-			case <-v.reqPrune:
-				{
-					history = newHistory(history.latest())
-					v.err <- nil
-				}
-			case p := <-v.setter:
-				{
-					v.err <- history.apply(&Event{Type: Set, Set: p})
-				}
-			case <-v.reqSnap:
-				{
-					v.respSnap <- history.latestWithCopy()
-				}
-			case id := <-v.reqTick:
-				{
-					if len(id) == 0 {
-						v.err <- errClockIdMustNotBeEmptyString
-					} else {
-						v.err <- history.apply(&Event{Type: Tick, Tick: id})
-					}
-				}
-			}
-		}
-
-	}()
-
-	keys := sortedKeys(init)
-	for _, key := range keys {
-		if err := v.Set(key, init[key]); err != nil {
-			return nil, v.Close()
-		}
-	}
-
-	return v, nil
+// NewWithHistory returns a VClock initialised with the specified
+// pairs, which maintains a full history.
+func NewWithHistory(init map[string]uint64) (*VClock, error) {
+	return newClock(init, true)
 }
 
 // Close releases all resources associated with the VClock instance
@@ -484,4 +268,240 @@ func (vc *VClock) DescendsFrom(other *VClock) (bool, error) {
 // identifier's value being less.
 func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 	return vc.compare(other, ancestor)
+}
+
+// newClock starts a new clock, with or without history
+func newClock(init map[string]uint64, maintainHistory bool) (*VClock, error) {
+	v := &VClock{
+		end:             make(chan bool),
+		err:             make(chan error),
+		reqComp:         make(chan *comp),
+		respComp:        make(chan bool),
+		reqFullHistory:  make(chan bool),
+		respFullHistory: make(chan []*HistoryItem),
+		reqGet:          make(chan string),
+		respGet:         make(chan *getterWithStatus),
+		reqHistory:      make(chan bool),
+		respHistory:     make(chan []map[string]uint64),
+		reqLastUpdate:   make(chan bool),
+		respLastUpdate:  make(chan *getter),
+		reqMerge:        make(chan map[string]uint64),
+		reqPrune:        make(chan bool),
+		reqSnap:         make(chan bool),
+		respSnap:        make(chan map[string]uint64),
+		reqTick:         make(chan string),
+		setter:          make(chan *SetInfo),
+	}
+
+	go clockLoop(v, maintainHistory)
+
+	keys := sortedKeys(init)
+	for _, key := range keys {
+		if err := v.Set(key, init[key]); err != nil {
+			return nil, v.Close()
+		}
+	}
+
+	return v, nil
+}
+
+// clockLoop is the goroutine started within calls to New...
+func clockLoop(v *VClock, maintainHistory bool) {
+	defer func() {
+		close(v.err)
+	}()
+
+	closer := func() {
+		close(v.end)
+		close(v.reqComp)
+		close(v.respComp)
+		close(v.reqFullHistory)
+		close(v.respFullHistory)
+		close(v.reqGet)
+		close(v.respGet)
+		close(v.reqHistory)
+		close(v.respHistory)
+		close(v.reqLastUpdate)
+		close(v.respLastUpdate)
+		close(v.reqMerge)
+		close(v.reqPrune)
+		close(v.reqSnap)
+		close(v.respSnap)
+		close(v.reqTick)
+		close(v.setter)
+	}
+
+	history := newHistory(map[string]uint64{})
+
+	for {
+
+		if !maintainHistory {
+			// Prune if history not being maintained
+			history = newHistory(history.latest())
+		}
+
+		select {
+		case <-v.end:
+			closer() // Prevent any further attempts to make requests
+			v.err <- errEnded
+			return
+		case c := <-v.reqComp:
+			{
+				vc := history.latest()
+
+				// Compare takes another clock and determines if it is equal, an
+				// ancestor, descendant, or concurrent with the callees clock.
+
+				var otherIs condition
+				// Preliminary qualification based on length
+				if len(vc) > len(c.other) {
+					if c.cond&(ancestor|concurrent) == 0 {
+						v.respComp <- false
+						continue
+					}
+					otherIs = ancestor
+				} else if len(vc) < len(c.other) {
+					if c.cond&(descendant|concurrent) == 0 {
+						v.respComp <- false
+						continue
+					}
+					otherIs = descendant
+				} else {
+					otherIs = equal
+				}
+
+				applyTest := true
+
+				keys := sortedKeys(vc)
+				otherKeys := sortedKeys(c.other)
+
+				if c.cond&(equal|descendant) != 0 {
+					// All of the identifiers in this clock must be present in the other
+					for _, key := range keys {
+						if _, ok := c.other[key]; !ok {
+							v.respComp <- false
+							applyTest = false
+							goto checkContinue
+						}
+					}
+				}
+				if c.cond&(equal|ancestor) != 0 {
+					// All of the identifiers in this clock must be present in the other
+					for _, key := range otherKeys {
+						if _, ok := vc[key]; !ok {
+							v.respComp <- false
+							applyTest = false
+							goto checkContinue
+						}
+					}
+				}
+
+				// Compare matching items, using sortedKeys to provide
+				// deterministic (sorted) comparison of lock identifiers
+				for _, id := range otherKeys {
+					if _, found := vc[id]; found {
+						if c.other[id] > vc[id] {
+							switch otherIs {
+							case equal:
+								if c.cond&descendant == 0 {
+									v.respComp <- false
+									applyTest = false
+									goto checkContinue
+								}
+								otherIs = descendant
+							case ancestor:
+								v.respComp <- c.cond&concurrent != 0
+								applyTest = false
+								goto checkContinue
+							}
+						} else if c.other[id] < vc[id] {
+							switch otherIs {
+							case equal:
+								if c.cond&ancestor == 0 {
+									v.respComp <- false
+									applyTest = false
+									goto checkContinue
+								}
+								otherIs = ancestor
+							case descendant:
+								v.respComp <- c.cond&concurrent != 0
+								applyTest = false
+								goto checkContinue
+							}
+						}
+					} else {
+						if otherIs == equal {
+							v.respComp <- c.cond&concurrent != 0
+							applyTest = false
+						} else if (len(c.other) - len(vc) - 1) < 0 {
+							applyTest = false
+							v.respComp <- c.cond&concurrent != 0
+						}
+						goto checkContinue
+					}
+				}
+			checkContinue:
+				if applyTest {
+					v.respComp <- c.cond&otherIs != 0
+				}
+			}
+		case <-v.reqFullHistory:
+			{
+				v.respFullHistory <- history.getFullAll()
+			}
+		case id := <-v.reqGet:
+			{
+				vc := history.latest()
+
+				val, ok := vc[id]
+				g := &getterWithStatus{b: ok}
+				g.id = id
+				g.v = val
+				v.respGet <- g
+			}
+		case <-v.reqHistory:
+			{
+				v.respHistory <- history.getAll()
+			}
+		case <-v.reqLastUpdate:
+			{
+				vc := history.latest()
+
+				var id string = ""
+				var last uint64
+				for key := range vc {
+					if vc[key] > last {
+						id = key
+						last = vc[key]
+					}
+				}
+				v.respLastUpdate <- &getter{id: id, v: last}
+			}
+		case other := <-v.reqMerge:
+			{
+				v.err <- history.apply(&Event{Type: Merge, Merge: other})
+			}
+		case <-v.reqPrune:
+			{
+				history = newHistory(history.latest())
+				v.err <- nil
+			}
+		case p := <-v.setter:
+			{
+				v.err <- history.apply(&Event{Type: Set, Set: p})
+			}
+		case <-v.reqSnap:
+			{
+				v.respSnap <- history.latestWithCopy()
+			}
+		case id := <-v.reqTick:
+			{
+				if len(id) == 0 {
+					v.err <- errClockIdMustNotBeEmptyString
+				} else {
+					v.err <- history.apply(&Event{Type: Tick, Tick: id})
+				}
+			}
+		}
+	}
 }

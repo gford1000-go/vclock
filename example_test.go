@@ -84,7 +84,7 @@ func ExampleNewShowingTick() {
 }
 
 func ExampleGetHistory() {
-	c, _ := New(map[string]uint64{"x": 0, "y": 0})
+	c, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
 	defer c.Close()
 
 	c.Tick("x")
@@ -98,7 +98,7 @@ func ExampleGetHistory() {
 }
 
 func ExampleGetFullHistory() {
-	c1, _ := New(map[string]uint64{"x": 0, "y": 0})
+	c1, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
 	defer c1.Close()
 
 	c1.Tick("x")
@@ -119,7 +119,7 @@ func ExampleGetFullHistory() {
 }
 
 func ExamplePrune() {
-	c, _ := New(map[string]uint64{"x": 0, "y": 0})
+	c, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
 	defer c.Close()
 
 	c.Tick("x")
