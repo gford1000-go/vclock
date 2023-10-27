@@ -97,6 +97,7 @@ var errAttemptToSetExistingId = errors.New("clock identifier cannot be reset onc
 var errAttemptToTickUnknownId = errors.New("attempted to tick unknown clock identifier")
 var errClosedVClock = errors.New("attempt to interact with closed clock")
 var errClockMustNotBeNil = errors.New("attempt to merge a nil clock")
+var errUnknownReqType = errors.New("received unknown request struct")
 
 // VClock is an instance of a vector clock that can suppport
 // concurrent use across multiple goroutines
@@ -380,6 +381,8 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 					v.resp <- &respErr{err: history.apply(&Event{Type: Tick, Tick: t.id})}
 				}
 			}
+		default:
+			v.resp <- &respErr{err: errUnknownReqType}
 		}
 	}
 }
