@@ -12,7 +12,7 @@ const (
 	concurrent                       // Clocks are completely independent, or partial overlap
 )
 
-type comp struct {
+type respComp struct {
 	other map[string]uint64
 	cond  condition
 }

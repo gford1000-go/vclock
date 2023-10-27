@@ -9,7 +9,7 @@ import (
 )
 
 type AllowedReq interface {
-	*reqEnd | *reqTick | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | map[string]uint64 | *comp
+	*respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick | map[string]uint64
 }
 
 type AllowedResp interface {
@@ -237,7 +237,7 @@ func (vc *VClock) compare(other *VClock, cond condition) (bool, error) {
 		return false, err
 	}
 
-	return attemptSendChanWithResp[*comp, bool](vc.req, &comp{other: m, cond: cond}, vc.resp, errClosedVClock)
+	return attemptSendChanWithResp[*respComp, bool](vc.req, &respComp{other: m, cond: cond}, vc.resp, errClosedVClock)
 }
 
 // Equal returns true if the contents of the other clock
@@ -315,7 +315,7 @@ func clockLoop(v *VClock, maintainHistory bool) {
 				close(v.req)
 				v.resp <- noErr
 			}
-		case *comp:
+		case *respComp:
 			{
 				v.resp <- compare(history.latest(), t.other, t.cond)
 			}
