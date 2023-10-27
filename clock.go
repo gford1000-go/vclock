@@ -8,17 +8,6 @@ import (
 	"sort"
 )
 
-// attemptSendChan will stop the panic and return recoverErr, should the chan be closed
-func attemptSendChan[T interface{}](c chan T, i T, e chan error, recoverErr error) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = recoverErr
-		}
-	}()
-	c <- i
-	return <-e
-}
-
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
 func attemptSendChanWithResp[T interface{}, U interface{}](c chan T, i T, r chan U, recoverErr error) (u U, err error) {
 	defer func() {
@@ -28,6 +17,15 @@ func attemptSendChanWithResp[T interface{}, U interface{}](c chan T, i T, r chan
 	}()
 	c <- i
 	return <-r, nil
+}
+
+// attemptSendChan is syntax sugar to simply the call when only an error would be returned
+func attemptSendChan[T interface{}](c chan T, i T, e chan error, recoverErr error) error {
+	u, err := attemptSendChanWithResp(c, i, e, recoverErr)
+	if err != nil {
+		return err
+	}
+	return u
 }
 
 // sortedKeys returns a sorted slice of the map's keys
