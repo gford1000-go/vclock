@@ -94,7 +94,7 @@ func ExampleGetHistory() {
 
 	history, _ := c.GetHistory()
 	fmt.Println(history)
-	// Output: [map[] map[x:0] map[x:0 y:0] map[x:1 y:0] map[x:2 y:0] map[x:2 y:1] map[x:3 y:1]]
+	// Output: [map[x:0 y:0] map[x:1 y:0] map[x:2 y:0] map[x:2 y:1] map[x:3 y:1]]
 }
 
 func ExampleGetFullHistory() {
@@ -115,7 +115,7 @@ func ExampleGetFullHistory() {
 	history, _ := c1.GetFullHistory()
 
 	fmt.Println(history)
-	// Output: [{0 <nil> map[]} {1 {Set {x 0}  map[]} map[x:0]} {2 {Set {y 0}  map[]} map[x:0 y:0]} {3 {Tick <nil> x map[]} map[x:1 y:0]} {4 {Tick <nil> x map[]} map[x:2 y:0]} {5 {Tick <nil> y map[]} map[x:2 y:1]} {6 {Tick <nil> x map[]} map[x:3 y:1]} {7 {Merge <nil>  map[z:7]} map[x:3 y:1 z:7]}]
+	// Output: [{0 <nil> map[x:0 y:0]} {1 {Tick <nil> x map[]} map[x:1 y:0]} {2 {Tick <nil> x map[]} map[x:2 y:0]} {3 {Tick <nil> y map[]} map[x:2 y:1]} {4 {Tick <nil> x map[]} map[x:3 y:1]} {5 {Merge <nil>  map[z:7]} map[x:3 y:1 z:7]}]
 }
 
 func ExamplePrune() {

@@ -5,7 +5,6 @@ import (
 	"cmp"
 	"encoding/gob"
 	"errors"
-	"fmt"
 	"sort"
 )
 
@@ -24,7 +23,6 @@ type AllowedResp interface {
 func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c chan any, t T, r chan any, recoverErr error) (u U, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println(r)
 			err = recoverErr
 		}
 	}()
@@ -285,27 +283,28 @@ func newClock(init Clock, maintainHistory bool) (*VClock, error) {
 		resp: make(chan any),
 	}
 
-	go clockLoop(v, maintainHistory)
-
-	keys := sortedKeys(init)
-	for _, key := range keys {
-		if err := v.Set(key, init[key]); err != nil {
-			return nil, v.Close()
-		}
-	}
+	go clockLoop(v, init, maintainHistory)
 
 	return v, nil
 }
 
 // clockLoop is the goroutine started within calls to New...
-func clockLoop(v *VClock, maintainHistory bool) {
+func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 	defer func() {
 		close(v.resp)
 	}()
 
 	noErr := &respErr{err: nil}
 
-	history := newHistory(Clock{})
+	c := Clock{}
+	if init != nil {
+		keys := sortedKeys(init)
+		for _, key := range keys {
+			c[key] = init[key]
+		}
+	}
+
+	history := newHistory(c)
 
 	for r := range v.req {
 
