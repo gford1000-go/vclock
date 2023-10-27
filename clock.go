@@ -12,7 +12,7 @@ import (
 type Clock map[string]uint64
 
 type AllowedReq interface {
-	map[string]uint64 | Clock | *respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
+	Clock | *respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
 }
 
 type AllowedResp interface {
