@@ -16,7 +16,7 @@ type AllowedReq interface {
 }
 
 type AllowedResp interface {
-	Clock | []Clock | *respErr | bool | *respGetter | *respGetterWithStatus | map[string]uint64 | []*HistoryItem
+	Clock | []Clock | *respErr | bool | *respGetter | *respGetterWithStatus | []*HistoryItem
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
