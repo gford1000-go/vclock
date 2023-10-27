@@ -16,7 +16,7 @@ type AllowedReq interface {
 }
 
 type AllowedResp interface {
-	Clock | []Clock | *respErr | bool | *getter | *getterWithStatus | map[string]uint64 | []*HistoryItem
+	Clock | []Clock | *respErr | bool | *respGetter | *respGetterWithStatus | map[string]uint64 | []*HistoryItem
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
@@ -82,13 +82,13 @@ type respErr struct {
 	err error
 }
 
-type getter struct {
+type respGetter struct {
 	id string
 	v  uint64
 }
 
-type getterWithStatus struct {
-	getter
+type respGetterWithStatus struct {
+	respGetter
 	b bool
 }
 
@@ -138,7 +138,7 @@ func (vc *VClock) Tick(id string) error {
 // Get returns the latest clock value for the specified identifier,
 // returning true if the identifier is found, otherwise false
 func (vc *VClock) Get(id string) (uint64, bool) {
-	resp, err := attemptSendChanWithResp[*reqGet, *getterWithStatus](vc.req, &reqGet{id: id}, vc.resp, errClosedVClock)
+	resp, err := attemptSendChanWithResp[*reqGet, *respGetterWithStatus](vc.req, &reqGet{id: id}, vc.resp, errClosedVClock)
 	if err != nil {
 		return 0, false
 	}
@@ -173,7 +173,7 @@ func (vc *VClock) Copy() (*VClock, error) {
 
 // LastUpdate returns the latest clock time and its associated identifier
 func (vc *VClock) LastUpdate() (id string, last uint64) {
-	g, err := attemptSendChanWithResp[*reqLastUpdate, *getter](vc.req, &reqLastUpdate{}, vc.resp, errClosedVClock)
+	g, err := attemptSendChanWithResp[*reqLastUpdate, *respGetter](vc.req, &reqLastUpdate{}, vc.resp, errClosedVClock)
 	if err != nil {
 		return "", 0
 	}
@@ -332,7 +332,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 				vc := history.latest()
 
 				val, ok := vc[t.id]
-				g := &getterWithStatus{b: ok}
+				g := &respGetterWithStatus{b: ok}
 				g.id = t.id
 				g.v = val
 				v.resp <- g
@@ -353,7 +353,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 						last = vc[key]
 					}
 				}
-				v.resp <- &getter{id: id, v: last}
+				v.resp <- &respGetter{id: id, v: last}
 			}
 		case Clock:
 			{
