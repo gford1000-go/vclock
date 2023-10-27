@@ -5,21 +5,26 @@ import (
 	"cmp"
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"sort"
 )
 
+// Clock is the underlying type of the vector clock
+type Clock map[string]uint64
+
 type AllowedReq interface {
-	*respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick | map[string]uint64
+	map[string]uint64 | Clock | *respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
 }
 
 type AllowedResp interface {
-	*respErr | bool | *getter | *getterWithStatus | map[string]uint64 | []*HistoryItem | []map[string]uint64
+	Clock | []Clock | *respErr | bool | *getter | *getterWithStatus | map[string]uint64 | []*HistoryItem
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
 func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c chan any, t T, r chan any, recoverErr error) (u U, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			fmt.Println(r)
 			err = recoverErr
 		}
 	}()
@@ -143,8 +148,8 @@ func (vc *VClock) Get(id string) (uint64, bool) {
 }
 
 // GetMap returns a copy of the complete vector clock map
-func (vc *VClock) GetMap() (map[string]uint64, error) {
-	return attemptSendChanWithResp[*reqSnap, map[string]uint64](vc.req, &reqSnap{}, vc.resp, errClosedVClock)
+func (vc *VClock) GetMap() (Clock, error) {
+	return attemptSendChanWithResp[*reqSnap, Clock](vc.req, &reqSnap{}, vc.resp, errClosedVClock)
 }
 
 // GetFullHistory returns a copy of each state change of the vectory clock map,
@@ -154,8 +159,8 @@ func (vc *VClock) GetFullHistory() ([]*HistoryItem, error) {
 }
 
 // GetHistory returns a copy of each state change of the vector clock map
-func (vc *VClock) GetHistory() ([]map[string]uint64, error) {
-	return attemptSendChanWithResp[*reqHistory, []map[string]uint64](vc.req, &reqHistory{}, vc.resp, errClosedVClock)
+func (vc *VClock) GetHistory() ([]Clock, error) {
+	return attemptSendChanWithResp[*reqHistory, []Clock](vc.req, &reqHistory{}, vc.resp, errClosedVClock)
 }
 
 // Copy creates a new VClock instance, initialised to the
@@ -274,7 +279,7 @@ func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 }
 
 // newClock starts a new clock, with or without history
-func newClock(init map[string]uint64, maintainHistory bool) (*VClock, error) {
+func newClock(init Clock, maintainHistory bool) (*VClock, error) {
 	v := &VClock{
 		req:  make(chan any),
 		resp: make(chan any),
@@ -300,7 +305,7 @@ func clockLoop(v *VClock, maintainHistory bool) {
 
 	noErr := &respErr{err: nil}
 
-	history := newHistory(map[string]uint64{})
+	history := newHistory(Clock{})
 
 	for r := range v.req {
 
@@ -351,7 +356,7 @@ func clockLoop(v *VClock, maintainHistory bool) {
 				}
 				v.resp <- &getter{id: id, v: last}
 			}
-		case map[string]uint64:
+		case Clock:
 			{
 				v.resp <- &respErr{err: history.apply(&Event{Type: Merge, Merge: t})}
 			}

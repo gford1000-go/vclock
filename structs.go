@@ -45,7 +45,7 @@ type Event struct {
 	Type  EventType
 	Set   *SetInfo
 	Tick  string
-	Merge map[string]uint64
+	Merge Clock
 }
 
 func (e *Event) String() string {
@@ -67,7 +67,7 @@ func (e *Event) copy() *Event {
 }
 
 // apply attempts to assign the change to the supplied map
-func (e *Event) apply(m map[string]uint64) error {
+func (e *Event) apply(m Clock) error {
 	switch e.Type {
 	case Set:
 		if len(e.Set.Id) == 0 {
@@ -104,7 +104,7 @@ func (e *Event) apply(m map[string]uint64) error {
 type HistoryItem struct {
 	HistoryId uint64
 	Change    *Event
-	Clock     map[string]uint64
+	Clock     Clock
 }
 
 // copy returns a deep copy of the instance

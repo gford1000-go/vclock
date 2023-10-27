@@ -65,9 +65,9 @@ func ExampleNewShowingTick() {
 	}
 
 	// The three processes of the example
-	var A *process = &process{id: "a", vc: newF(map[string]uint64{"a": 0})}
-	var B *process = &process{id: "b", vc: newF(map[string]uint64{"b": 0})}
-	var C *process = &process{id: "c", vc: newF(map[string]uint64{"c": 0})}
+	var A *process = &process{id: "a", vc: newF(Clock{"a": 0})}
+	var B *process = &process{id: "b", vc: newF(Clock{"b": 0})}
+	var C *process = &process{id: "c", vc: newF(Clock{"c": 0})}
 
 	// This is the event sequence of the example
 	transfer(C, B)
@@ -84,7 +84,7 @@ func ExampleNewShowingTick() {
 }
 
 func ExampleGetHistory() {
-	c, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
+	c, _ := NewWithHistory(Clock{"x": 0, "y": 0})
 	defer c.Close()
 
 	c.Tick("x")
@@ -98,7 +98,7 @@ func ExampleGetHistory() {
 }
 
 func ExampleGetFullHistory() {
-	c1, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
+	c1, _ := NewWithHistory(Clock{"x": 0, "y": 0})
 	defer c1.Close()
 
 	c1.Tick("x")
@@ -107,7 +107,7 @@ func ExampleGetFullHistory() {
 	c1.Tick("x")
 
 	// Show all possible Event types by merging another clock
-	c2, _ := New(map[string]uint64{"z": 7})
+	c2, _ := New(Clock{"z": 7})
 	defer c2.Close()
 	c1.Merge(c2)
 
@@ -119,7 +119,7 @@ func ExampleGetFullHistory() {
 }
 
 func ExamplePrune() {
-	c, _ := NewWithHistory(map[string]uint64{"x": 0, "y": 0})
+	c, _ := NewWithHistory(Clock{"x": 0, "y": 0})
 	defer c.Close()
 
 	c.Tick("x")

@@ -36,12 +36,12 @@ func (h *history) apply(event *Event) error {
 }
 
 // latest returns the current clock value
-func (h *history) latest() map[string]uint64 {
+func (h *history) latest() Clock {
 	return h.items[h.getLastId()].Clock
 }
 
 // latestWithCopy returns a copy of the current clock value
-func (h *history) latestWithCopy() map[string]uint64 {
+func (h *history) latestWithCopy() Clock {
 	return copyMap(h.latest())
 }
 
@@ -51,11 +51,11 @@ func (h *history) getLastId() uint64 {
 }
 
 // getRange returns the specified range of history
-func (h *history) getRange(from, to uint64) []map[string]uint64 {
+func (h *history) getRange(from, to uint64) []Clock {
 	if from > to {
 		return h.getRange(to, from)
 	}
-	ret := []map[string]uint64{}
+	ret := []Clock{}
 	for i := from; i <= to; i++ {
 		if i <= h.getLastId() {
 			ret = append(ret, copyMap(h.items[i].Clock))
@@ -65,7 +65,7 @@ func (h *history) getRange(from, to uint64) []map[string]uint64 {
 }
 
 // getAll returns all of the history
-func (h *history) getAll() []map[string]uint64 {
+func (h *history) getAll() []Clock {
 	return h.getRange(0, h.getLastId())
 }
 
@@ -89,7 +89,7 @@ func (h *history) getFullAll() []*HistoryItem {
 }
 
 // newHistory initialises an instance of history
-func newHistory(m map[string]uint64) *history {
+func newHistory(m Clock) *history {
 	return &history{
 		lastId: 0,
 		items: []*HistoryItem{
