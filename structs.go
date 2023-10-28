@@ -66,33 +66,36 @@ func (e *Event) copy() *Event {
 	return ret
 }
 
-// apply attempts to assign the change to the supplied map
-func (e *Event) apply(m Clock) error {
+// apply attempts to assign the change to the supplied map,
+// transforming the identifiers using the supplied function
+func (e *Event) apply(m Clock, f func(string) string) error {
 	switch e.Type {
 	case Set:
 		if len(e.Set.Id) == 0 {
 			return errClockIdMustNotBeEmptyString
-		} else {
-			if _, ok := m[e.Set.Id]; !ok {
-				m[e.Set.Id] = e.Set.Value
-			} else {
-				return errAttemptToSetExistingId
-			}
 		}
+
+		id := f(e.Set.Id)
+		if _, ok := m[id]; ok {
+			return errAttemptToSetExistingId
+		}
+		m[id] = e.Set.Value
 	case Tick:
-		if _, ok := m[e.Tick]; ok {
-			m[e.Tick] += 1
-		} else {
+		id := f(e.Tick)
+		if _, ok := m[id]; !ok {
 			return errAttemptToTickUnknownId
 		}
+
+		m[id] += 1
 	case Merge:
 		for id := range e.Merge {
-			if _, ok := m[id]; ok {
-				if m[id] < e.Merge[id] {
-					m[id] = e.Merge[id]
+			nid := f(id)
+			if _, ok := m[nid]; ok {
+				if m[nid] < e.Merge[id] {
+					m[nid] = e.Merge[id]
 				}
 			} else {
-				m[id] = e.Merge[id]
+				m[nid] = e.Merge[id]
 			}
 		}
 	}
@@ -112,6 +115,20 @@ func (h *HistoryItem) copy() *HistoryItem {
 	hi := &HistoryItem{
 		HistoryId: h.HistoryId,
 		Clock:     copyMap(h.Clock),
+	}
+
+	if h.Change != nil {
+		hi.Change = h.Change.copy()
+	}
+	return hi
+}
+
+// copyWithKeyModification returns a deep copy of the instance,
+// where keys in the Clock are adjusted by the function supplied.
+func (h *HistoryItem) copyWithKeyModification(f func(string) string) *HistoryItem {
+	hi := &HistoryItem{
+		HistoryId: h.HistoryId,
+		Clock:     copyMapWithKeyModification(h.Clock, f),
 	}
 
 	if h.Change != nil {

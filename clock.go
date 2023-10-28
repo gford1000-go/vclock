@@ -297,6 +297,8 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 
 	noErr := &respErr{err: nil}
 
+	shortener, _ := NewShortener(func(s string) string { return s })
+
 	c := Clock{}
 	if init != nil {
 		keys := sortedKeys(init)
@@ -305,13 +307,13 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 		}
 	}
 
-	history := newHistory(c)
+	history := newHistory(c, shortener, true)
 
 	for r := range v.req {
 
 		if !maintainHistory {
 			// Prune if history not being maintained
-			history = newHistory(history.latest())
+			history = newHistory(history.latest(), shortener, false)
 		}
 
 		switch t := r.(type) {
@@ -322,7 +324,8 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			}
 		case *respComp:
 			{
-				v.resp <- compare(history.latest(), t.other, t.cond)
+				c := copyMapWithKeyModification(t.other, shortener.Shorten)
+				v.resp <- compare(history.latest(), c, t.cond)
 			}
 		case *reqFullHistory:
 			{
@@ -332,7 +335,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			{
 				vc := history.latest()
 
-				val, ok := vc[t.id]
+				val, ok := vc[shortener.Shorten(t.id)]
 				g := &respGetterWithStatus{b: ok}
 				g.id = t.id
 				g.v = val
@@ -354,7 +357,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 						last = vc[key]
 					}
 				}
-				v.resp <- &respGetter{id: id, v: last}
+				v.resp <- &respGetter{id: shortener.Recover(id), v: last}
 			}
 		case Clock:
 			{
@@ -362,7 +365,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			}
 		case *reqPrune:
 			{
-				history = newHistory(history.latest())
+				history = newHistory(history.latest(), shortener, false)
 				v.resp <- noErr
 			}
 		case *SetInfo:
@@ -371,7 +374,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			}
 		case *reqSnap:
 			{
-				v.resp <- history.latestWithCopy()
+				v.resp <- history.latestWithCopy(false)
 			}
 		case *reqTick:
 			{
