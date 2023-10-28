@@ -2,9 +2,18 @@ package vclock
 
 import "testing"
 
+func BenchmarkNew(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		c, _ := New(Clock{"a": 0}, nil)
+		defer c.Close()
+	}
+}
+
 func BenchmarkTick(b *testing.B) {
 
 	c, _ := New(Clock{"a": 0}, nil)
+	defer c.Close()
 
 	for i := 0; i < b.N; i++ {
 		c.Tick("a")
@@ -18,6 +27,7 @@ func BenchmarkTick(b *testing.B) {
 func BenchmarkTickWithHistory(b *testing.B) {
 
 	c, _ := NewWithHistory(Clock{"a": 0}, nil)
+	defer c.Close()
 
 	for i := 0; i < b.N; i++ {
 		c.Tick("a")
@@ -31,9 +41,12 @@ func BenchmarkTickWithHistory(b *testing.B) {
 func BenchmarkMerge(b *testing.B) {
 
 	other, _ := New(Clock{"b": 1}, nil)
+	defer other.Close()
 
 	for i := 0; i < b.N; i++ {
 		c, _ := New(Clock{"a": 0}, nil)
+		defer c.Close()
+
 		c.Merge(other)
 	}
 }
@@ -41,9 +54,12 @@ func BenchmarkMerge(b *testing.B) {
 func BenchmarkMergeWithHistory(b *testing.B) {
 
 	other, _ := NewWithHistory(Clock{"b": 1}, nil)
+	defer other.Close()
 
 	for i := 0; i < b.N; i++ {
 		c, _ := New(Clock{"a": 0}, nil)
+		defer c.Close()
+
 		c.Merge(other)
 	}
 }
@@ -51,6 +67,7 @@ func BenchmarkMergeWithHistory(b *testing.B) {
 func BenchmarkBytes(b *testing.B) {
 
 	c, _ := New(Clock{"a": 1}, nil)
+	defer c.Close()
 
 	for i := 0; i < b.N; i++ {
 		c.Bytes()
@@ -60,6 +77,7 @@ func BenchmarkBytes(b *testing.B) {
 func BenchmarkBytesWithHistory(b *testing.B) {
 
 	c, _ := NewWithHistory(Clock{"a": 1}, nil)
+	defer c.Close()
 
 	for i := 0; i < b.N; i++ {
 		c.Bytes()
@@ -69,19 +87,25 @@ func BenchmarkBytesWithHistory(b *testing.B) {
 func BenchmarkFromBytes(b *testing.B) {
 
 	c, _ := New(Clock{"a": 1}, nil)
+	defer c.Close()
+
 	buf, _ := c.Bytes()
 
 	for i := 0; i < b.N; i++ {
-		FromBytes(buf, nil)
+		n, _ := FromBytes(buf, nil)
+		n.Close()
 	}
 }
 
 func BenchmarkFromBytesWithHistory(b *testing.B) {
 
 	c, _ := NewWithHistory(Clock{"a": 1}, nil)
+	defer c.Close()
+
 	buf, _ := c.Bytes()
 
 	for i := 0; i < b.N; i++ {
-		FromBytes(buf, nil)
+		n, _ := FromBytes(buf, nil)
+		n.Close()
 	}
 }
