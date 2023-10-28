@@ -6,7 +6,7 @@ import (
 )
 
 func ExampleNew() {
-	c, _ := New(map[string]uint64{"x": 0, "y": 0})
+	c, _ := New(map[string]uint64{"x": 0, "y": 0}, nil)
 	defer c.Close()
 
 	var wg sync.WaitGroup
@@ -35,7 +35,7 @@ func ExampleNewShowingTick() {
 	// This example illustrates an implementation of the vector clock
 	// example from https://en.wikipedia.org/wiki/Vector_clock
 
-	newF := func(m map[string]uint64) *VClock { vc, _ := New(m); return vc }
+	newF := func(m map[string]uint64) *VClock { vc, _ := New(m, nil); return vc }
 
 	// process emulates an autonomous process with a globally unique identifier
 	type process struct {
@@ -56,7 +56,7 @@ func ExampleNewShowingTick() {
 		// Emulates receiving a vector clock as part of an event moving between processes
 		recv := func(to *process, b []byte) {
 			to.vc.Tick(to.id)
-			vc, _ := FromBytes(b)
+			vc, _ := FromBytes(b, nil)
 			to.vc.Merge(vc)
 		}
 
@@ -84,7 +84,7 @@ func ExampleNewShowingTick() {
 }
 
 func ExampleGetHistory() {
-	c, _ := NewWithHistory(Clock{"x": 0, "y": 0})
+	c, _ := NewWithHistory(Clock{"x": 0, "y": 0}, nil)
 	defer c.Close()
 
 	c.Tick("x")
@@ -98,7 +98,7 @@ func ExampleGetHistory() {
 }
 
 func ExampleGetFullHistory() {
-	c1, _ := NewWithHistory(Clock{"x": 0, "y": 0})
+	c1, _ := NewWithHistory(Clock{"x": 0, "y": 0}, nil)
 	defer c1.Close()
 
 	c1.Tick("x")
@@ -107,7 +107,7 @@ func ExampleGetFullHistory() {
 	c1.Tick("x")
 
 	// Show all possible Event types by merging another clock
-	c2, _ := New(Clock{"z": 7})
+	c2, _ := New(Clock{"z": 7}, nil)
 	defer c2.Close()
 	c1.Merge(c2)
 
@@ -119,7 +119,7 @@ func ExampleGetFullHistory() {
 }
 
 func ExamplePrune() {
-	c, _ := NewWithHistory(Clock{"x": 0, "y": 0})
+	c, _ := NewWithHistory(Clock{"x": 0, "y": 0}, nil)
 	defer c.Close()
 
 	c.Tick("x")

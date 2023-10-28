@@ -102,20 +102,25 @@ var errUnknownReqType = errors.New("received unknown request struct")
 // VClock is an instance of a vector clock that can suppport
 // concurrent use across multiple goroutines
 type VClock struct {
-	req  chan any
-	resp chan any
+	req       chan any
+	resp      chan any
+	shortener IdentifierShortener
 }
 
 // New returns a VClock initialised with the specified pairs,
-// which does not maintain any history.
-func New(init map[string]uint64) (*VClock, error) {
-	return newClock(init, false)
+// which does not maintain any history.  The specified shortener
+// (which may be nil) reduces the memory footprint of the vector
+// clock if the identifiers are large strings
+func New(init map[string]uint64, shortener IdentifierShortener) (*VClock, error) {
+	return newClock(init, false, shortener)
 }
 
 // NewWithHistory returns a VClock initialised with the specified
-// pairs, which maintains a full history.
-func NewWithHistory(init map[string]uint64) (*VClock, error) {
-	return newClock(init, true)
+// pairs, which maintains a full history.  The specified shortener
+// (which may be nil) reduces the memory footprint of the vector
+// clock if the identifiers are large strings
+func NewWithHistory(init map[string]uint64, shortener IdentifierShortener) (*VClock, error) {
+	return newClock(init, true, shortener)
 }
 
 // Close releases all resources associated with the VClock instance
@@ -169,7 +174,7 @@ func (vc *VClock) Copy() (*VClock, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(m)
+	return New(m, vc.shortener)
 }
 
 // LastUpdate returns the latest clock time and its associated identifier
@@ -216,8 +221,9 @@ func (vc *VClock) Bytes() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-// FromBytes decodes a vector clock
-func FromBytes(data []byte) (vc *VClock, err error) {
+// FromBytes decodes a vector clock.  This requires both
+// the serialised clock and also an IdentifierShortener (which may be nil)
+func FromBytes(data []byte, shortener IdentifierShortener) (vc *VClock, err error) {
 	b := new(bytes.Buffer)
 	b.Write(data)
 	dec := gob.NewDecoder(b)
@@ -226,7 +232,7 @@ func FromBytes(data []byte) (vc *VClock, err error) {
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
 	}
-	return New(m)
+	return New(m, shortener)
 }
 
 // Compare takes another clock and determines if it is Equal, an
@@ -278,10 +284,15 @@ func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 }
 
 // newClock starts a new clock, with or without history
-func newClock(init Clock, maintainHistory bool) (*VClock, error) {
+func newClock(init Clock, maintainHistory bool, shortener IdentifierShortener) (*VClock, error) {
 	v := &VClock{
-		req:  make(chan any),
-		resp: make(chan any),
+		req:       make(chan any),
+		resp:      make(chan any),
+		shortener: shortener,
+	}
+
+	if v.shortener == nil {
+		v.shortener, _ = NewShortener(func(s string) string { return s })
 	}
 
 	go clockLoop(v, init, maintainHistory)
@@ -297,8 +308,6 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 
 	noErr := &respErr{err: nil}
 
-	shortener, _ := NewShortener(func(s string) string { return s })
-
 	c := Clock{}
 	if init != nil {
 		keys := sortedKeys(init)
@@ -307,13 +316,13 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 		}
 	}
 
-	history := newHistory(c, shortener, true)
+	history := newHistory(c, v.shortener, true)
 
 	for r := range v.req {
 
 		if !maintainHistory {
 			// Prune if history not being maintained
-			history = newHistory(history.latest(), shortener, false)
+			history = newHistory(history.latest(), v.shortener, false)
 		}
 
 		switch t := r.(type) {
@@ -324,7 +333,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			}
 		case *respComp:
 			{
-				c := copyMapWithKeyModification(t.other, shortener.Shorten)
+				c := copyMapWithKeyModification(t.other, v.shortener.Shorten)
 				v.resp <- compare(history.latest(), c, t.cond)
 			}
 		case *reqFullHistory:
@@ -335,7 +344,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			{
 				vc := history.latest()
 
-				val, ok := vc[shortener.Shorten(t.id)]
+				val, ok := vc[v.shortener.Shorten(t.id)]
 				g := &respGetterWithStatus{b: ok}
 				g.id = t.id
 				g.v = val
@@ -357,7 +366,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 						last = vc[key]
 					}
 				}
-				v.resp <- &respGetter{id: shortener.Recover(id), v: last}
+				v.resp <- &respGetter{id: v.shortener.Recover(id), v: last}
 			}
 		case Clock:
 			{
@@ -365,7 +374,7 @@ func clockLoop(v *VClock, init Clock, maintainHistory bool) {
 			}
 		case *reqPrune:
 			{
-				history = newHistory(history.latest(), shortener, false)
+				history = newHistory(history.latest(), v.shortener, false)
 				v.resp <- noErr
 			}
 		case *SetInfo:
