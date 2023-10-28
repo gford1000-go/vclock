@@ -111,7 +111,7 @@ type VClock struct {
 // which does not maintain any history.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
-func New(init map[string]uint64, shortener IdentifierShortener) (*VClock, error) {
+func New(init Clock, shortener IdentifierShortener) (*VClock, error) {
 	return newClock(init, false, shortener)
 }
 
@@ -119,7 +119,7 @@ func New(init map[string]uint64, shortener IdentifierShortener) (*VClock, error)
 // pairs, which maintains a full history.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
-func NewWithHistory(init map[string]uint64, shortener IdentifierShortener) (*VClock, error) {
+func NewWithHistory(init Clock, shortener IdentifierShortener) (*VClock, error) {
 	return newClock(init, true, shortener)
 }
 
@@ -228,7 +228,7 @@ func FromBytes(data []byte, shortener IdentifierShortener) (vc *VClock, err erro
 	b.Write(data)
 	dec := gob.NewDecoder(b)
 
-	m := map[string]uint64{}
+	m := Clock{}
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
 	}
