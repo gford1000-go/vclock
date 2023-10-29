@@ -3,6 +3,7 @@ package vclock
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/gob"
 	"errors"
 	"sort"
@@ -12,7 +13,7 @@ import (
 type Clock map[string]uint64
 
 type AllowedReq interface {
-	Clock | *respComp | *reqEnd | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
+	Clock | *respComp | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
 }
 
 type AllowedResp interface {
@@ -50,9 +51,6 @@ func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
-}
-
-type reqEnd struct {
 }
 
 type reqFullHistory struct {
@@ -105,27 +103,30 @@ type VClock struct {
 	req       chan any
 	resp      chan any
 	shortener IdentifierShortener
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // New returns a VClock initialised with the specified pairs,
 // which does not maintain any history.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
-func New(init Clock, shortener IdentifierShortener) (*VClock, error) {
-	return newClock(init, false, shortener)
+func New(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
+	return newClock(context, init, false, shortener)
 }
 
 // NewWithHistory returns a VClock initialised with the specified
 // pairs, which maintains a full history.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
-func NewWithHistory(init Clock, shortener IdentifierShortener) (*VClock, error) {
-	return newClock(init, true, shortener)
+func NewWithHistory(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
+	return newClock(context, init, true, shortener)
 }
 
 // Close releases all resources associated with the VClock instance
 func (vc *VClock) Close() error {
-	return attemptSendChan(vc.req, &reqEnd{}, vc.resp, errClosedVClock)
+	vc.cancel()
+	return nil
 }
 
 // Set assigns the specified value to the given clock identifier.
@@ -174,7 +175,7 @@ func (vc *VClock) Copy() (*VClock, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(m, vc.shortener)
+	return New(vc.ctx, m, vc.shortener)
 }
 
 // LastUpdate returns the latest clock time and its associated identifier
@@ -223,7 +224,7 @@ func (vc *VClock) Bytes() ([]byte, error) {
 
 // FromBytes decodes a vector clock.  This requires both
 // the serialised clock and also an IdentifierShortener (which may be nil)
-func FromBytes(data []byte, shortener IdentifierShortener) (vc *VClock, err error) {
+func FromBytes(context context.Context, data []byte, shortener IdentifierShortener) (vc *VClock, err error) {
 	b := new(bytes.Buffer)
 	b.Write(data)
 	dec := gob.NewDecoder(b)
@@ -232,7 +233,7 @@ func FromBytes(data []byte, shortener IdentifierShortener) (vc *VClock, err erro
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
 	}
-	return New(m, shortener)
+	return New(context, m, shortener)
 }
 
 // Compare takes another clock and determines if it is Equal, an
@@ -284,117 +285,125 @@ func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 }
 
 // newClock starts a new clock, with or without history
-func newClock(init Clock, maintainHistory bool, shortener IdentifierShortener) (*VClock, error) {
+func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener IdentifierShortener) (*VClock, error) {
+
+	ctx, cancel := context.WithCancel(ctx)
+
 	v := &VClock{
 		req:       make(chan any),
 		resp:      make(chan any),
 		shortener: shortener,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 
 	if v.shortener == nil {
 		v.shortener, _ = NewShortener(func(s string) string { return s })
 	}
 
-	go clockLoop(v, init, maintainHistory)
+	go func() {
+		defer func() {
+			close(v.req)
+			close(v.resp)
+		}()
 
-	return v, nil
-}
+		noErr := &respErr{err: nil}
 
-// clockLoop is the goroutine started within calls to New...
-func clockLoop(v *VClock, init Clock, maintainHistory bool) {
-	defer func() {
-		close(v.resp)
-	}()
-
-	noErr := &respErr{err: nil}
-
-	c := Clock{}
-	if init != nil {
-		keys := sortedKeys(init)
-		for _, key := range keys {
-			c[key] = init[key]
-		}
-	}
-
-	history := newHistory(c, v.shortener, true)
-
-	for r := range v.req {
-
-		if !maintainHistory {
-			// Prune if history not being maintained
-			history = newHistory(history.latest(), v.shortener, false)
+		c := Clock{}
+		if init != nil {
+			keys := sortedKeys(init)
+			for _, key := range keys {
+				c[key] = init[key]
+			}
 		}
 
-		switch t := r.(type) {
-		case *reqEnd:
-			{
-				close(v.req)
-				v.resp <- noErr
-			}
-		case *respComp:
-			{
-				c := copyMapWithKeyModification(t.other, v.shortener.Shorten)
-				v.resp <- compare(history.latest(), c, t.cond)
-			}
-		case *reqFullHistory:
-			{
-				v.resp <- history.getFullAll()
-			}
-		case *reqGet:
-			{
-				vc := history.latest()
+		history := newHistory(c, v.shortener, true)
 
-				val, ok := vc[v.shortener.Shorten(t.id)]
-				g := &respGetterWithStatus{b: ok}
-				g.id = t.id
-				g.v = val
-				v.resp <- g
-			}
-		case *reqHistory:
-			{
-				v.resp <- history.getAll()
-			}
-		case *reqLastUpdate:
-			{
-				vc := history.latest()
+		processRequest := func(r any) {
 
-				var id string = ""
-				var last uint64
-				for key := range vc {
-					if vc[key] > last {
-						id = key
-						last = vc[key]
+			if !maintainHistory {
+				// Prune if history not being maintained
+				history = newHistory(history.latest(), v.shortener, false)
+			}
+
+			switch t := r.(type) {
+			case *respComp:
+				{
+					c := copyMapWithKeyModification(t.other, v.shortener.Shorten)
+					v.resp <- compare(history.latest(), c, t.cond)
+				}
+			case *reqFullHistory:
+				{
+					v.resp <- history.getFullAll()
+				}
+			case *reqGet:
+				{
+					vc := history.latest()
+
+					val, ok := vc[v.shortener.Shorten(t.id)]
+					g := &respGetterWithStatus{b: ok}
+					g.id = t.id
+					g.v = val
+					v.resp <- g
+				}
+			case *reqHistory:
+				{
+					v.resp <- history.getAll()
+				}
+			case *reqLastUpdate:
+				{
+					vc := history.latest()
+
+					var id string = ""
+					var last uint64
+					for key := range vc {
+						if vc[key] > last {
+							id = key
+							last = vc[key]
+						}
+					}
+					v.resp <- &respGetter{id: v.shortener.Recover(id), v: last}
+				}
+			case Clock:
+				{
+					v.resp <- &respErr{err: history.apply(&Event{Type: Merge, Merge: t})}
+				}
+			case *reqPrune:
+				{
+					history = newHistory(history.latest(), v.shortener, false)
+					v.resp <- noErr
+				}
+			case *SetInfo:
+				{
+					v.resp <- &respErr{err: history.apply(&Event{Type: Set, Set: t})}
+				}
+			case *reqSnap:
+				{
+					v.resp <- history.latestWithCopy(false)
+				}
+			case *reqTick:
+				{
+					if len(t.id) == 0 {
+						v.resp <- &respErr{err: errClockIdMustNotBeEmptyString}
+					} else {
+						v.resp <- &respErr{err: history.apply(&Event{Type: Tick, Tick: t.id})}
 					}
 				}
-				v.resp <- &respGetter{id: v.shortener.Recover(id), v: last}
+			default:
+				v.resp <- &respErr{err: errUnknownReqType}
 			}
-		case Clock:
-			{
-				v.resp <- &respErr{err: history.apply(&Event{Type: Merge, Merge: t})}
-			}
-		case *reqPrune:
-			{
-				history = newHistory(history.latest(), v.shortener, false)
-				v.resp <- noErr
-			}
-		case *SetInfo:
-			{
-				v.resp <- &respErr{err: history.apply(&Event{Type: Set, Set: t})}
-			}
-		case *reqSnap:
-			{
-				v.resp <- history.latestWithCopy(false)
-			}
-		case *reqTick:
-			{
-				if len(t.id) == 0 {
-					v.resp <- &respErr{err: errClockIdMustNotBeEmptyString}
-				} else {
-					v.resp <- &respErr{err: history.apply(&Event{Type: Tick, Tick: t.id})}
-				}
-			}
-		default:
-			v.resp <- &respErr{err: errUnknownReqType}
 		}
-	}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case r := <-v.req:
+				processRequest(r)
+			}
+		}
+
+	}()
+
+	return v, nil
 }
