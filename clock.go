@@ -107,16 +107,16 @@ type VClock struct {
 	cancel    context.CancelFunc
 }
 
-// New returns a VClock initialised with the specified pairs,
-// which does not maintain any history.  The specified shortener
+// New returns a VClock that is initialised with the specified Clock details,
+// and which will not maintain any history.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
 func New(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
 	return newClock(context, init, false, shortener)
 }
 
-// NewWithHistory returns a VClock initialised with the specified
-// pairs, which maintains a full history.  The specified shortener
+// NewWithHistory returns a VClock that is initialised with the specified Clock details,
+// and which will maintain a full history of all updates.  The specified shortener
 // (which may be nil) reduces the memory footprint of the vector
 // clock if the identifiers are large strings
 func NewWithHistory(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
