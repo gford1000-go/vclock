@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 func ExampleNew() {
@@ -141,4 +142,22 @@ func ExamplePrune() {
 	history, _ := c.GetHistory()
 	fmt.Println(history)
 	// Output: [map[x:3 y:1]]
+}
+
+func ExampleContextCancelled() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	vc, _ := NewWithHistory(ctx, Clock{"x": 0, "y": 0}, nil)
+	defer vc.Close()
+
+	// Underlying context is cancelled ...
+	// Sleep to allow context goroutine to run
+	cancel()
+	time.Sleep(100 * time.Microsecond)
+
+	// Vector clock will be closed
+	_, err := vc.GetMap()
+
+	fmt.Println(err)
+	// Output: attempt to interact with closed clock
 }
