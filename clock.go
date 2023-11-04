@@ -155,8 +155,8 @@ func (vc *VClock) Get(id string) (uint64, bool) {
 	return resp.v, resp.b
 }
 
-// GetMap returns a copy of the complete vector clock map
-func (vc *VClock) GetMap() (Clock, error) {
+// GetClock returns a copy of the complete vector clock map
+func (vc *VClock) GetClock() (Clock, error) {
 	return attemptSendChanWithResp[*reqSnap, Clock](vc.req, &reqSnap{}, vc.resp, errClosedVClock)
 }
 
@@ -174,7 +174,7 @@ func (vc *VClock) GetHistory() ([]Clock, error) {
 // Copy creates a new VClock instance, initialised to the
 // values of this instance
 func (vc *VClock) Copy() (*VClock, error) {
-	m, err := vc.GetMap()
+	m, err := vc.GetClock()
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (vc *VClock) Merge(other *VClock) error {
 		return errClockMustNotBeNil
 	}
 
-	m, err := other.GetMap()
+	m, err := other.GetClock()
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func (vc *VClock) compare(other *VClock, cond condition) (bool, error) {
 		return false, errClockMustNotBeNil
 	}
 
-	m, err := other.GetMap()
+	m, err := other.GetClock()
 	if err != nil {
 		return false, err
 	}

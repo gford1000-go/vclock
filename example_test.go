@@ -29,7 +29,7 @@ func ExampleNew() {
 
 	wg.Wait()
 
-	m, _ := c.GetMap()
+	m, _ := c.GetClock()
 	fmt.Println(m)
 	// Output: map[x:5 y:5]
 }
@@ -83,7 +83,7 @@ func ExampleNewShowingTick() {
 	transfer(B, C)
 	transfer(C, A)
 
-	a, _ := A.vc.GetMap()
+	a, _ := A.vc.GetClock()
 	fmt.Println(a)
 	// Output: map[a:4 b:5 c:5]
 }
@@ -156,7 +156,7 @@ func ExampleContextCancelled() {
 	time.Sleep(100 * time.Microsecond)
 
 	// Vector clock will be closed
-	_, err := vc.GetMap()
+	_, err := vc.GetClock()
 
 	fmt.Println(err)
 	// Output: attempt to interact with closed clock

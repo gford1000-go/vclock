@@ -19,7 +19,7 @@ func TestNew(t *testing.T) {
 	}
 	defer v.Close()
 
-	m, err := v.GetMap()
+	m, err := v.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -40,7 +40,7 @@ func TestNewWithInit(t *testing.T) {
 	}
 	defer v.Close()
 
-	m, err := v.GetMap()
+	m, err := v.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -69,7 +69,7 @@ func TestUseAfterClose(t *testing.T) {
 	// goroutine to execute so that the vector clock is actually closed
 	time.Sleep(1 * time.Millisecond)
 
-	_, err = v.GetMap()
+	_, err = v.GetClock()
 	if err == nil {
 		t.Fatal("unexpected pass when expected error")
 	} else {
@@ -160,7 +160,7 @@ func TestSetNewID(t *testing.T) {
 
 	init["c"] = 4
 
-	m, err := v.GetMap()
+	m, err := v.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -217,7 +217,7 @@ func TestSetTickID(t *testing.T) {
 
 	init["a"] = 2
 
-	m, err := v.GetMap()
+	m, err := v.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -320,7 +320,7 @@ func TestSerialise(t *testing.T) {
 	}
 	defer v2.Close()
 
-	m, err := v2.GetMap()
+	m, err := v2.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -376,7 +376,7 @@ func TestCopy(t *testing.T) {
 	}
 	defer v2.Close()
 
-	m, err := v2.GetMap()
+	m, err := v2.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -505,7 +505,7 @@ func TestMergeWithSelf(t *testing.T) {
 		}
 	}
 
-	m, err := v1.GetMap()
+	m, err := v1.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -554,7 +554,7 @@ func TestMergeWithAnotherClock(t *testing.T) {
 			}
 		}
 
-		m, err := vc1.GetMap()
+		m, err := vc1.GetClock()
 		if err != nil {
 			t.Fatalf("unexpected error %q\n", err.Error())
 		}
@@ -2186,7 +2186,7 @@ func TestFromBytes2(t *testing.T) {
 		t.Fatalf("unexpected error deseralising (%v)", err)
 	}
 
-	c2, err := vc1.GetMap()
+	c2, err := vc1.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error getting map (%v)", err)
 	}
@@ -2207,7 +2207,7 @@ func TestFromBytes3(t *testing.T) {
 		t.Fatalf("unexpected error deseralising (%v)", err)
 	}
 
-	c2, err := vc1.GetMap()
+	c2, err := vc1.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error getting map (%v)", err)
 	}
@@ -2228,7 +2228,7 @@ func TestFromBytes4(t *testing.T) {
 		t.Fatalf("unexpected error deseralising (%v)", err)
 	}
 
-	c2, err := vc1.GetMap()
+	c2, err := vc1.GetClock()
 	if err != nil {
 		t.Fatalf("unexpected error getting map (%v)", err)
 	}
