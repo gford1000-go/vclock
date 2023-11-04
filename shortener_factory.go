@@ -1,6 +1,10 @@
 package vclock
 
-import "errors"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+)
 
 // factory is a singleton instance of a factory
 var factory *ShortenerFactory
@@ -12,6 +16,9 @@ func init() {
 
 	noop, _ := NewInMemoryShortener("NoOp", func(s string) string { return s })
 	factory.Register(noop)
+
+	sha256, _ := NewInMemoryShortener("SHA256", func(s string) string { return hex.EncodeToString(sha256.New().Sum([]byte(s))) })
+	factory.Register(sha256)
 }
 
 // GetShortenerFactory returns the ShortenerFactory

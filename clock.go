@@ -13,7 +13,7 @@ import (
 type Clock map[string]uint64
 
 type AllowedReq interface {
-	Clock | *respComp | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *SetInfo | *reqTick
+	Clock | *respComp | *reqFullHistory | *reqGet | *reqHistory | *reqLastUpdate | *reqPrune | *reqSnap | *reqSnapShortenedIdentifiers | *SetInfo | *reqTick
 }
 
 type AllowedResp interface {
@@ -72,6 +72,9 @@ type reqPrune struct {
 type reqSnap struct {
 }
 
+type reqSnapShortenedIdentifiers struct {
+}
+
 type reqTick struct {
 	id string
 }
@@ -112,7 +115,7 @@ type VClock struct {
 // (which may be empty string) reduces the memory footprint of the vector
 // clock if the identifiers are large strings.
 func New(context context.Context, init Clock, shortenerName string) (*VClock, error) {
-	return newClock(context, init, false, shortenerName)
+	return newClock(context, init, false, shortenerName, true)
 }
 
 // NewWithHistory returns a VClock that is initialised with the specified Clock details,
@@ -120,7 +123,7 @@ func New(context context.Context, init Clock, shortenerName string) (*VClock, er
 // (which may be empty string) reduces the memory footprint of the vector
 // clock if the identifiers are large strings.
 func NewWithHistory(context context.Context, init Clock, shortenerName string) (*VClock, error) {
-	return newClock(context, init, true, shortenerName)
+	return newClock(context, init, true, shortenerName, true)
 }
 
 // Close releases all resources associated with the VClock instance
@@ -210,12 +213,12 @@ func (vc *VClock) Prune() error {
 type clockSerialisation struct {
 	C Clock
 	S string
-	B bool
 }
 
 // Bytes returns an encoded vector clock
 func (vc *VClock) Bytes() ([]byte, error) {
-	m, err := vc.GetMap()
+
+	m, err := attemptSendChanWithResp[*reqSnapShortenedIdentifiers, Clock](vc.req, &reqSnapShortenedIdentifiers{}, vc.resp, errClosedVClock)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +229,6 @@ func (vc *VClock) Bytes() ([]byte, error) {
 		&clockSerialisation{
 			C: m,
 			S: vc.shortener,
-			B: false,
 		}); err != nil {
 		return nil, err
 	}
@@ -259,10 +261,14 @@ func fromBytes(context context.Context, data []byte, maintainHistory bool, short
 		return nil, err
 	}
 
-	// If the Clock was serialised using shortened identifiers (i.e. cs.B == true),
-	// and the preferred shortener name differs from that used by the serialising
+	if shortenerName == "" {
+		shortenerName = getDefaultShortenerName()
+	}
+
+	// As the Clock was serialised using shortened identifiers,
+	// if the preferred shortener name differs from that used by the serialising
 	// clock, then need to recover to the unshortened identifiers
-	if cs.B {
+	if cs.S != shortenerName {
 		shortener, err := GetShortenerFactory().Get(cs.S)
 		if err != nil {
 			return nil, err
@@ -271,10 +277,11 @@ func fromBytes(context context.Context, data []byte, maintainHistory bool, short
 		for k, v := range cs.C {
 			newC[shortener.Recover(k)] = v
 		}
-		return newClock(context, newC, maintainHistory, shortenerName)
+
+		return newClock(context, newC, maintainHistory, shortenerName, true)
 	}
 
-	return newClock(context, cs.C, maintainHistory, shortenerName)
+	return newClock(context, cs.C, maintainHistory, shortenerName, false)
 }
 
 // Compare takes another clock and determines if it is Equal, an
@@ -330,7 +337,7 @@ func getDefaultShortenerName() string {
 }
 
 // newClock starts a new clock, with or without history
-func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string) (*VClock, error) {
+func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string, applyShortenerToInit bool) (*VClock, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -363,7 +370,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 			}
 		}
 
-		history := newHistory(c, shortener, true)
+		history := newHistory(c, shortener, applyShortenerToInit)
 
 		processRequest := func(r any) {
 
@@ -426,6 +433,10 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 			case *reqSnap:
 				{
 					v.resp <- history.latestWithCopy(false)
+				}
+			case *reqSnapShortenedIdentifiers:
+				{
+					v.resp <- history.latestWithCopy(true)
 				}
 			case *reqTick:
 				{

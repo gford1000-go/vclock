@@ -3,6 +3,7 @@ package vclock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -2173,4 +2174,67 @@ func TestAncestorOf11(t *testing.T) {
 	if result {
 		t.Fatal("expected inequality (false) but true returned")
 	}
+}
+
+func TestFromBytes2(t *testing.T) {
+
+	c1, _ := New(context.Background(), Clock{"a": 1, "b": 2}, "")
+	b1, _ := c1.Bytes()
+
+	vc1, err := FromBytes(context.Background(), b1, "SHA256")
+	if err != nil {
+		t.Fatalf("unexpected error deseralising (%v)", err)
+	}
+
+	c2, err := vc1.GetMap()
+	if err != nil {
+		t.Fatalf("unexpected error getting map (%v)", err)
+	}
+
+	if fmt.Sprint(c2) != "map[a:1 b:2]" {
+		t.Fatalf("unexpected map returned (%v)", fmt.Sprint(c2))
+	}
+
+}
+
+func TestFromBytes3(t *testing.T) {
+
+	c1, _ := New(context.Background(), Clock{"a": 1, "b": 2}, "SHA256")
+	b1, _ := c1.Bytes()
+
+	vc1, err := FromBytes(context.Background(), b1, "")
+	if err != nil {
+		t.Fatalf("unexpected error deseralising (%v)", err)
+	}
+
+	c2, err := vc1.GetMap()
+	if err != nil {
+		t.Fatalf("unexpected error getting map (%v)", err)
+	}
+
+	if fmt.Sprint(c2) != "map[a:1 b:2]" {
+		t.Fatalf("unexpected map returned (%v)", fmt.Sprint(c2))
+	}
+
+}
+
+func TestFromBytes4(t *testing.T) {
+
+	c1, _ := New(context.Background(), Clock{"a": 1, "b": 2}, "SHA256")
+	b1, _ := c1.Bytes()
+
+	vc1, err := FromBytes(context.Background(), b1, "SHA256")
+	if err != nil {
+		t.Fatalf("unexpected error deseralising (%v)", err)
+	}
+
+	c2, err := vc1.GetMap()
+	if err != nil {
+		t.Fatalf("unexpected error getting map (%v)", err)
+	}
+
+	if fmt.Sprint(c2) != "map[a:1 b:2]" {
+		t.Fatalf("unexpected map returned (%v)", fmt.Sprint(c2))
+	}
+
 }
