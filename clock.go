@@ -2,13 +2,11 @@ package vclock
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/gob"
 	"errors"
-	"runtime"
-	"sort"
-	"strconv"
+
+	"github.com/gford1000-go/syncmap"
 )
 
 // Clock is the underlying type of the vector clock
@@ -49,18 +47,6 @@ func attemptSendChan[T AllowedReq](c *Channel[any], t T, r *Channel[any], recove
 		return err
 	}
 	return resp.err
-}
-
-// sortedKeys returns a sorted slice of the map's keys
-func sortedKeys[K cmp.Ordered, V any](m map[K]V) []K {
-	keys := make([]K, len(m))
-	i := 0
-	for k := range m {
-		keys[i] = k
-		i++
-	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-	return keys
 }
 
 type reqFullHistory struct {
@@ -346,31 +332,6 @@ func getDefaultShortenerName() string {
 	return "NoOp"
 }
 
-var (
-	goroutinePrefix = []byte("goroutine ")
-	errBadStack     = errors.New("invalid runtime.Stack output")
-)
-
-// This is terrible, slow, and should never be used.
-func goid() (int, error) {
-	buf := make([]byte, 32)
-	n := runtime.Stack(buf, false)
-	buf = buf[:n]
-	// goroutine 1 [running]: ...
-
-	buf, ok := bytes.CutPrefix(buf, goroutinePrefix)
-	if !ok {
-		return 0, errBadStack
-	}
-
-	i := bytes.IndexByte(buf, ' ')
-	if i < 0 {
-		return 0, errBadStack
-	}
-
-	return strconv.Atoi(string(buf[:i]))
-}
-
 // newClock starts a new clock, with or without history
 func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string, applyShortenerToInit bool) (*VClock, error) {
 
@@ -391,13 +352,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 
 	waiter := make(chan bool)
 
-	// gid, _ := goid()
-
 	go func() {
-
-		// gidc, _ := goid()
-
-		// fmt.Printf("newClock: parent %v, child %v\n", gid, gidc)
 
 		defer func() {
 			v.req.Close()
@@ -408,7 +363,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 
 		c := Clock{}
 		if init != nil {
-			keys := sortedKeys(init)
+			keys := syncmap.SortedKeys(init)
 			for _, key := range keys {
 				c[key] = init[key]
 			}

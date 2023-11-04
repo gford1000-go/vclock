@@ -1,5 +1,7 @@
 package vclock
 
+import "github.com/gford1000-go/syncmap"
+
 // condition constants define how to compare a vector clock against another,
 // and may be ORed together when being provided to the Compare method.
 type condition int
@@ -37,8 +39,8 @@ func compare(vc, other map[string]uint64, cond condition) bool {
 		otherIs = equal
 	}
 
-	keys := sortedKeys(vc)
-	otherKeys := sortedKeys(other)
+	keys := syncmap.SortedKeys(vc)
+	otherKeys := syncmap.SortedKeys(other)
 
 	if cond&(equal|descendant) != 0 {
 		// All of the identifiers in this clock must be present in the other
