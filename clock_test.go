@@ -12,7 +12,7 @@ func TestNew(t *testing.T) {
 
 	ctx := context.Background()
 
-	v, err := New(ctx, nil, nil)
+	v, err := New(ctx, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -33,7 +33,7 @@ func TestNewWithInit(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -58,7 +58,7 @@ func TestUseAfterClose(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -83,7 +83,7 @@ func TestDoubleClose(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -104,7 +104,7 @@ func TestSetExisting(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -125,7 +125,7 @@ func TestSetBlank(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -146,7 +146,7 @@ func TestSetNewID(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -178,7 +178,7 @@ func TestSetNewIDAfterClose(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -203,7 +203,7 @@ func TestSetTickID(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -235,7 +235,7 @@ func TestTickBlank(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -256,7 +256,7 @@ func TestTickUnknown(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -277,7 +277,7 @@ func TestTickAfterClose(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v, err := New(ctx, init, nil)
+	v, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -302,7 +302,7 @@ func TestSerialise(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -313,7 +313,7 @@ func TestSerialise(t *testing.T) {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 
-	v2, err := FromBytes(ctx, b, nil)
+	v2, err := FromBytes(ctx, b, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -338,7 +338,7 @@ func TestSerialiseClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -363,7 +363,7 @@ func TestCopy(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -394,7 +394,7 @@ func TestCopyClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -419,7 +419,7 @@ func TestGet(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -449,7 +449,7 @@ func TestGetAfterClose(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -470,7 +470,7 @@ func TestMergeWithNil(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -491,7 +491,7 @@ func TestMergeWithSelf(t *testing.T) {
 	ctx := context.Background()
 
 	init := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init, nil)
+	v1, err := New(ctx, init, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -523,14 +523,14 @@ func TestMergeWithAnotherClock(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 3, "c": 17}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -538,7 +538,7 @@ func TestMergeWithAnotherClock(t *testing.T) {
 
 	result12 := Clock{"a": 3, "b": 14, "c": 17}
 
-	v3, err := New(ctx, nil, nil)
+	v3, err := New(ctx, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -579,7 +579,7 @@ func TestMergeWithSelfClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -590,7 +590,7 @@ func TestMergeWithSelfClosed(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	init2 := Clock{"a": 3, "c": 17}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -609,14 +609,14 @@ func TestMergeWithOtherClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 3, "c": 17}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -639,13 +639,13 @@ func TestLastUpdate(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
-	v2, err := New(ctx, nil, nil)
+	v2, err := New(ctx, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -671,7 +671,7 @@ func TestLastUpdateClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -700,7 +700,7 @@ func TestEqualSame(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -727,7 +727,7 @@ func TestEqualClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -759,7 +759,7 @@ func TestEqualOtherClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -790,7 +790,7 @@ func TestEqualOtherClockNil(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -811,14 +811,14 @@ func TestEqualConcurrentClocks(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"c": 1, "d": 14}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -839,14 +839,14 @@ func TestEqualClocksOverlapping(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "c": 14}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -867,14 +867,14 @@ func TestEqualDescendent(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -895,14 +895,14 @@ func TestEqualAncestor1(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -923,14 +923,14 @@ func TestEqualAncestor2(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -951,7 +951,7 @@ func TestConcurrentSame(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -978,14 +978,14 @@ func TestConcurrent1(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"c": 2, "d": 12}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1006,14 +1006,14 @@ func TestConcurrent2(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "d": 12}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1034,14 +1034,14 @@ func TestConcurrent3(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "d": 12}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1062,14 +1062,14 @@ func TestConcurrent4(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1090,14 +1090,14 @@ func TestConcurrent5(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 14, "c": 2}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1118,14 +1118,14 @@ func TestConcurrent6(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 14, "c": 2, "d": 1, "e": 54}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1146,7 +1146,7 @@ func TestConcurrentClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1178,7 +1178,7 @@ func TestConcurrentOtherClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1209,7 +1209,7 @@ func TestConcurrentOtherClockNil(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1230,7 +1230,7 @@ func TestDescendsFromSame(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1257,14 +1257,14 @@ func TestDescendsFrom1(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"c": 8, "d": 11}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1285,14 +1285,14 @@ func TestDescendsFrom2(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "d": 11}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1313,14 +1313,14 @@ func TestDescendsFrom3(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "d": 11}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1341,14 +1341,14 @@ func TestDescendsFrom4(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1369,14 +1369,14 @@ func TestDescendsFrom5(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "b": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1397,14 +1397,14 @@ func TestDescendsFrom6(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "b": 14}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1425,14 +1425,14 @@ func TestDescendsFrom7(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "b": 14, "c": 2}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1453,14 +1453,14 @@ func TestDescendsFrom8(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "b": 15}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1481,14 +1481,14 @@ func TestDescendsFrom9(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 15}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1509,14 +1509,14 @@ func TestDescendsFrom10(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 15, "c": 3, "d": 7}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1537,14 +1537,14 @@ func TestDescendsFrom11(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 14}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1565,14 +1565,14 @@ func TestDescendsFrom12(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1593,14 +1593,14 @@ func TestDescendsFrom13(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "c": 13}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1621,14 +1621,14 @@ func TestDescendsFrom14(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "c": 13, "d": 17}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1649,14 +1649,14 @@ func TestDescendsFrom15(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 2, "c": 13, "d": 17}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1677,7 +1677,7 @@ func TestDescendsFromClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1709,7 +1709,7 @@ func TestDescendsFromOtherClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1740,7 +1740,7 @@ func TestDescendsFromOtherClockNil(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1761,7 +1761,7 @@ func TestAncestorOfSame(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1788,7 +1788,7 @@ func TestAncestorOfClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1820,7 +1820,7 @@ func TestAncestorOfOtherClockClosed(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1851,7 +1851,7 @@ func TestAncestorOfOtherClockNil(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1872,14 +1872,14 @@ func TestAncestorOf1(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 14}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1900,14 +1900,14 @@ func TestAncestorOf2(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1928,14 +1928,14 @@ func TestAncestorOf3(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1956,14 +1956,14 @@ func TestAncestorOf4(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 23}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -1984,14 +1984,14 @@ func TestAncestorOf5(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 23, "c": 8}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2012,14 +2012,14 @@ func TestAncestorOf6(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 23, "c": 7}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2040,14 +2040,14 @@ func TestAncestorOf7(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "b": 24, "c": 7}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2068,14 +2068,14 @@ func TestAncestorOf8(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1, "b": 24, "c": 8}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2096,14 +2096,14 @@ func TestAncestorOf9(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 1}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2124,14 +2124,14 @@ func TestAncestorOf10(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"a": 0, "d": 3}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
@@ -2152,14 +2152,14 @@ func TestAncestorOf11(t *testing.T) {
 	ctx := context.Background()
 
 	init1 := Clock{"a": 1, "b": 23, "c": 8}
-	v1, err := New(ctx, init1, nil)
+	v1, err := New(ctx, init1, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}
 	defer v1.Close()
 
 	init2 := Clock{"d": 3}
-	v2, err := New(ctx, init2, nil)
+	v2, err := New(ctx, init2, "")
 	if err != nil {
 		t.Fatalf("unexpected error %q\n", err.Error())
 	}

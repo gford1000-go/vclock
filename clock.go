@@ -102,25 +102,25 @@ var errUnknownReqType = errors.New("received unknown request struct")
 type VClock struct {
 	req       chan any
 	resp      chan any
-	shortener IdentifierShortener
+	shortener string
 	ctx       context.Context
 	cancel    context.CancelFunc
 }
 
 // New returns a VClock that is initialised with the specified Clock details,
 // and which will not maintain any history.  The specified shortener
-// (which may be nil) reduces the memory footprint of the vector
-// clock if the identifiers are large strings
-func New(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
-	return newClock(context, init, false, shortener)
+// (which may be empty string) reduces the memory footprint of the vector
+// clock if the identifiers are large strings.
+func New(context context.Context, init Clock, shortenerName string) (*VClock, error) {
+	return newClock(context, init, false, shortenerName)
 }
 
 // NewWithHistory returns a VClock that is initialised with the specified Clock details,
 // and which will maintain a full history of all updates.  The specified shortener
-// (which may be nil) reduces the memory footprint of the vector
-// clock if the identifiers are large strings
-func NewWithHistory(context context.Context, init Clock, shortener IdentifierShortener) (*VClock, error) {
-	return newClock(context, init, true, shortener)
+// (which may be empty string) reduces the memory footprint of the vector
+// clock if the identifiers are large strings.
+func NewWithHistory(context context.Context, init Clock, shortenerName string) (*VClock, error) {
+	return newClock(context, init, true, shortenerName)
 }
 
 // Close releases all resources associated with the VClock instance
@@ -223,8 +223,8 @@ func (vc *VClock) Bytes() ([]byte, error) {
 }
 
 // FromBytes decodes a vector clock.  This requires both
-// the serialised clock and also an IdentifierShortener (which may be nil)
-func FromBytes(context context.Context, data []byte, shortener IdentifierShortener) (vc *VClock, err error) {
+// the serialised clock and also the name of the IdentifierShortener to be used (which may be empty string)
+func FromBytes(context context.Context, data []byte, shortenerName string) (vc *VClock, err error) {
 	b := new(bytes.Buffer)
 	b.Write(data)
 	dec := gob.NewDecoder(b)
@@ -233,7 +233,7 @@ func FromBytes(context context.Context, data []byte, shortener IdentifierShorten
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
 	}
-	return New(context, m, shortener)
+	return New(context, m, shortenerName)
 }
 
 // Compare takes another clock and determines if it is Equal, an
@@ -285,21 +285,22 @@ func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 }
 
 // newClock starts a new clock, with or without history
-func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener IdentifierShortener) (*VClock, error) {
+func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string) (*VClock, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	v := &VClock{
 		req:       make(chan any),
 		resp:      make(chan any),
-		shortener: shortener,
+		shortener: shortenerName,
 		ctx:       ctx,
 		cancel:    cancel,
 	}
 
-	if v.shortener == nil {
-		v.shortener, _ = GetShortenerFactory().Get("NoOp")
+	if v.shortener == "" {
+		v.shortener = "NoOp"
 	}
+	shortener, _ := GetShortenerFactory().Get(v.shortener)
 
 	go func() {
 		defer func() {
@@ -317,19 +318,19 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener I
 			}
 		}
 
-		history := newHistory(c, v.shortener, true)
+		history := newHistory(c, shortener, true)
 
 		processRequest := func(r any) {
 
 			if !maintainHistory {
 				// Prune if history not being maintained
-				history = newHistory(history.latest(), v.shortener, false)
+				history = newHistory(history.latest(), shortener, false)
 			}
 
 			switch t := r.(type) {
 			case *respComp:
 				{
-					c := copyMapWithKeyModification(t.other, v.shortener.Shorten)
+					c := copyMapWithKeyModification(t.other, shortener.Shorten)
 					v.resp <- compare(history.latest(), c, t.cond)
 				}
 			case *reqFullHistory:
@@ -340,7 +341,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener I
 				{
 					vc := history.latest()
 
-					val, ok := vc[v.shortener.Shorten(t.id)]
+					val, ok := vc[shortener.Shorten(t.id)]
 					g := &respGetterWithStatus{b: ok}
 					g.id = t.id
 					g.v = val
@@ -362,7 +363,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener I
 							last = vc[key]
 						}
 					}
-					v.resp <- &respGetter{id: v.shortener.Recover(id), v: last}
+					v.resp <- &respGetter{id: shortener.Recover(id), v: last}
 				}
 			case Clock:
 				{
@@ -370,7 +371,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener I
 				}
 			case *reqPrune:
 				{
-					history = newHistory(history.latest(), v.shortener, false)
+					history = newHistory(history.latest(), shortener, false)
 					v.resp <- noErr
 				}
 			case *SetInfo:
