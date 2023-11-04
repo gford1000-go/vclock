@@ -2,6 +2,8 @@ package vclock
 
 import (
 	"errors"
+
+	"github.com/gford1000-go/syncmap"
 )
 
 // IdentifierShortener provides functions to shorten vector clock
@@ -29,7 +31,7 @@ func NewInMemoryShortener(name string, shortener Shortener) (*InMemoryShortener,
 	}
 
 	return &InMemoryShortener{
-		sm: NewSynchronisedMap[string, string](nil),
+		sm: syncmap.New[string, string](nil),
 		f:  shortener,
 		n:  name,
 	}, nil
@@ -39,7 +41,7 @@ func NewInMemoryShortener(name string, shortener Shortener) (*InMemoryShortener,
 // of Shorten for a given string, so that it can be
 // easily recovered.
 type InMemoryShortener struct {
-	sm *SynchronisedMap[string, string]
+	sm *syncmap.SynchronisedMap[string, string]
 	f  Shortener
 	n  string
 }

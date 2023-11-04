@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+
+	"github.com/gford1000-go/syncmap"
 )
 
 // factory is a singleton instance of a factory
@@ -11,7 +13,7 @@ var factory *ShortenerFactory
 
 func init() {
 	factory = &ShortenerFactory{
-		m: NewSynchronisedMap[string, IdentifierShortener](nil),
+		m: syncmap.New[string, IdentifierShortener](nil),
 	}
 
 	noop, _ := NewInMemoryShortener("NoOp", func(s string) string { return s })
@@ -30,7 +32,7 @@ var ErrShortenerMustNotBeNil = errors.New("shortener cannot be nil")
 
 // ShortenerFactory manages IdentifierShortener instances
 type ShortenerFactory struct {
-	m *SynchronisedMap[string, IdentifierShortener]
+	m *syncmap.SynchronisedMap[string, IdentifierShortener]
 }
 
 // Register adds the specified shortener, returns error if the shortener

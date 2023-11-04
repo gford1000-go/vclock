@@ -1,2 +1,4 @@
+github.com/gford1000-go/syncmap v0.0.0-20231104192044-847e326d160a h1:L+x+nLe8kXa0lsr1qdd/D4r/BLQuIRAR3EYYPLBCZfY=
+github.com/gford1000-go/syncmap v0.0.0-20231104192044-847e326d160a/go.mod h1:MASFrhePypaEVNCBevXoNfIOFaBHJRJ87yXnwpnqsk4=
 golang.org/x/exp v0.0.0-20231006140011-7918f672742d h1:jtJma62tbqLibJ5sFQz8bKtEM8rJBtfilJ2qTU199MI=
 golang.org/x/exp v0.0.0-20231006140011-7918f672742d/go.mod h1:ldy0pHrwJyGW56pPQzzkH36rKxoZW1tw7ZJpeKx+hdo=
