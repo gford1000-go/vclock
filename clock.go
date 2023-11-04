@@ -207,6 +207,12 @@ func (vc *VClock) Prune() error {
 	return attemptSendChan(vc.req, &reqPrune{}, vc.resp, errClosedVClock)
 }
 
+type clockSerialisation struct {
+	C Clock
+	S string
+	B bool
+}
+
 // Bytes returns an encoded vector clock
 func (vc *VClock) Bytes() ([]byte, error) {
 	m, err := vc.GetMap()
@@ -216,24 +222,59 @@ func (vc *VClock) Bytes() ([]byte, error) {
 
 	b := new(bytes.Buffer)
 	enc := gob.NewEncoder(b)
-	if err := enc.Encode(m); err != nil {
+	if err := enc.Encode(
+		&clockSerialisation{
+			C: m,
+			S: vc.shortener,
+			B: false,
+		}); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
 }
 
+// FromBytesWithHistory decodes a vector clock and preserves history from this point forwards.  This requires both
+// the serialised clock and also the name of the IdentifierShortener to be used (which may be empty string)
+func FromBytesWithHistory(context context.Context, data []byte, shortenerName string) (vc *VClock, err error) {
+	return fromBytes(context, data, true, shortenerName)
+}
+
 // FromBytes decodes a vector clock.  This requires both
 // the serialised clock and also the name of the IdentifierShortener to be used (which may be empty string)
 func FromBytes(context context.Context, data []byte, shortenerName string) (vc *VClock, err error) {
+	return fromBytes(context, data, false, shortenerName)
+}
+
+// fromBytes deseralises and initialises a VClock
+func fromBytes(context context.Context, data []byte, maintainHistory bool, shortenerName string) (vc *VClock, err error) {
 	b := new(bytes.Buffer)
 	b.Write(data)
 	dec := gob.NewDecoder(b)
 
-	m := Clock{}
-	if err := dec.Decode(&m); err != nil {
+	cs := clockSerialisation{
+		C: Clock{},
+	}
+
+	if err := dec.Decode(&cs); err != nil {
 		return nil, err
 	}
-	return New(context, m, shortenerName)
+
+	// If the Clock was serialised using shortened identifiers (i.e. cs.B == true),
+	// and the preferred shortener name differs from that used by the serialising
+	// clock, then need to recover to the unshortened identifiers
+	if cs.B {
+		shortener, err := GetShortenerFactory().Get(cs.S)
+		if err != nil {
+			return nil, err
+		}
+		newC := Clock{}
+		for k, v := range cs.C {
+			newC[shortener.Recover(k)] = v
+		}
+		return newClock(context, newC, maintainHistory, shortenerName)
+	}
+
+	return newClock(context, cs.C, maintainHistory, shortenerName)
 }
 
 // Compare takes another clock and determines if it is Equal, an
@@ -284,6 +325,10 @@ func (vc *VClock) AncestorOf(other *VClock) (bool, error) {
 	return vc.compare(other, ancestor)
 }
 
+func getDefaultShortenerName() string {
+	return "NoOp"
+}
+
 // newClock starts a new clock, with or without history
 func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string) (*VClock, error) {
 
@@ -298,7 +343,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 	}
 
 	if v.shortener == "" {
-		v.shortener = "NoOp"
+		v.shortener = getDefaultShortenerName()
 	}
 	shortener, _ := GetShortenerFactory().Get(v.shortener)
 
