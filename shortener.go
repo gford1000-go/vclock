@@ -2,12 +2,12 @@ package vclock
 
 import (
 	"errors"
-	"sync"
 )
 
 // IdentifierShortener provides functions to shorten vector clock
 // identifiers to minimise the overall memory footprint of the clock.
 type IdentifierShortener interface {
+	Name() string
 	Shorten(s string) string
 	Recover(s string) string
 }
@@ -16,17 +16,22 @@ type IdentifierShortener interface {
 type Shortener func(string) string
 
 var errShortenerIsNil = errors.New("shortener must not be nil")
+var errShortenerNameIsNil = errors.New("shortener name must be non-empty string")
 
-// NewShortener creates an instance of InMemoryShortener that will
+// NewInMemoryShortener creates an instance of InMemoryShortener that will
 // use the specified Shortener
-func NewShortener(shortener Shortener) (*InMemoryShortener, error) {
+func NewInMemoryShortener(name string, shortener Shortener) (*InMemoryShortener, error) {
+	if len(name) == 0 {
+		return nil, errShortenerNameIsNil
+	}
 	if shortener == nil {
 		return nil, errShortenerIsNil
 	}
 
 	return &InMemoryShortener{
-		m: map[string]string{},
-		f: shortener,
+		sm: NewSynchronisedMap[string, string](nil),
+		f:  shortener,
+		n:  name,
 	}, nil
 }
 
@@ -34,22 +39,25 @@ func NewShortener(shortener Shortener) (*InMemoryShortener, error) {
 // of Shorten for a given string, so that it can be
 // easily recovered.
 type InMemoryShortener struct {
-	lck sync.Mutex
-	m   map[string]string
-	f   Shortener
+	sm *SynchronisedMap[string, string]
+	f  Shortener
+	n  string
+}
+
+func (h *InMemoryShortener) Name() string {
+	return h.n
 }
 
 func (h *InMemoryShortener) Shorten(s string) string {
-	h.lck.Lock()
-	defer h.lck.Unlock()
-
 	k := h.f(s)
-	h.m[k] = s
+	h.sm.Insert(k, s, false)
 	return k
 }
 
 func (h *InMemoryShortener) Recover(s string) string {
-	h.lck.Lock()
-	defer h.lck.Unlock()
-	return h.m[s]
+	if ss, err := h.sm.Get(s); err != nil {
+		return ""
+	} else {
+		return ss
+	}
 }

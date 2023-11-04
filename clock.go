@@ -298,7 +298,7 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortener I
 	}
 
 	if v.shortener == nil {
-		v.shortener, _ = NewShortener(func(s string) string { return s })
+		v.shortener, _ = GetShortenerFactory().Get("NoOp")
 	}
 
 	go func() {
