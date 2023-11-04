@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/gob"
 	"errors"
+	"runtime"
 	"sort"
+	"strconv"
 )
 
 // Clock is the underlying type of the vector clock
@@ -21,19 +23,27 @@ type AllowedResp interface {
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
-func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c chan any, t T, r chan any, recoverErr error) (u U, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = recoverErr
+func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c *Channel[any], t T, r *Channel[any], recoverErr error) (u U, err error) {
+	handleChanErr := func(e error) (U, error) {
+		var u U
+		if !errors.Is(e, ErrChannelClosed) {
+			return u, e
 		}
-	}()
-	c <- t
-	a := <-r
-	return a.(U), nil
+		return u, recoverErr
+	}
+
+	if err := c.Send(t); err != nil {
+		return handleChanErr(err)
+	}
+	if resp, err := r.Recv(); err != nil {
+		return handleChanErr(err)
+	} else {
+		return resp.(U), nil
+	}
 }
 
 // attemptSendChan is syntax sugar to simply the call when only an error would be returned
-func attemptSendChan[T AllowedReq](c chan any, t T, r chan any, recoverErr error) error {
+func attemptSendChan[T AllowedReq](c *Channel[any], t T, r *Channel[any], recoverErr error) error {
 	resp, err := attemptSendChanWithResp[T, *respErr](c, t, r, recoverErr)
 	if err != nil {
 		return err
@@ -103,8 +113,8 @@ var errUnknownReqType = errors.New("received unknown request struct")
 // VClock is an instance of a vector clock that can suppport
 // concurrent use across multiple goroutines
 type VClock struct {
-	req       chan any
-	resp      chan any
+	req       *Channel[any]
+	resp      *Channel[any]
 	shortener string
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -336,14 +346,39 @@ func getDefaultShortenerName() string {
 	return "NoOp"
 }
 
+var (
+	goroutinePrefix = []byte("goroutine ")
+	errBadStack     = errors.New("invalid runtime.Stack output")
+)
+
+// This is terrible, slow, and should never be used.
+func goid() (int, error) {
+	buf := make([]byte, 32)
+	n := runtime.Stack(buf, false)
+	buf = buf[:n]
+	// goroutine 1 [running]: ...
+
+	buf, ok := bytes.CutPrefix(buf, goroutinePrefix)
+	if !ok {
+		return 0, errBadStack
+	}
+
+	i := bytes.IndexByte(buf, ' ')
+	if i < 0 {
+		return 0, errBadStack
+	}
+
+	return strconv.Atoi(string(buf[:i]))
+}
+
 // newClock starts a new clock, with or without history
 func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerName string, applyShortenerToInit bool) (*VClock, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 
 	v := &VClock{
-		req:       make(chan any),
-		resp:      make(chan any),
+		req:       NewChannel[any](),
+		resp:      NewChannel[any](),
 		shortener: shortenerName,
 		ctx:       ctx,
 		cancel:    cancel,
@@ -354,10 +389,19 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 	}
 	shortener, _ := GetShortenerFactory().Get(v.shortener)
 
+	waiter := make(chan bool)
+
+	// gid, _ := goid()
+
 	go func() {
+
+		// gidc, _ := goid()
+
+		// fmt.Printf("newClock: parent %v, child %v\n", gid, gidc)
+
 		defer func() {
-			close(v.req)
-			close(v.resp)
+			v.req.Close()
+			v.resp.Close()
 		}()
 
 		noErr := &respErr{err: nil}
@@ -383,11 +427,11 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 			case *respComp:
 				{
 					c := copyMapWithKeyModification(t.other, shortener.Shorten)
-					v.resp <- compare(history.latest(), c, t.cond)
+					v.resp.Send(compare(history.latest(), c, t.cond))
 				}
 			case *reqFullHistory:
 				{
-					v.resp <- history.getFullAll()
+					v.resp.Send(history.getFullAll())
 				}
 			case *reqGet:
 				{
@@ -397,11 +441,11 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 					g := &respGetterWithStatus{b: ok}
 					g.id = t.id
 					g.v = val
-					v.resp <- g
+					v.resp.Send(g)
 				}
 			case *reqHistory:
 				{
-					v.resp <- history.getAll()
+					v.resp.Send(history.getAll())
 				}
 			case *reqLastUpdate:
 				{
@@ -415,52 +459,59 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 							last = vc[key]
 						}
 					}
-					v.resp <- &respGetter{id: shortener.Recover(id), v: last}
+					v.resp.Send(&respGetter{id: shortener.Recover(id), v: last})
 				}
 			case Clock:
 				{
-					v.resp <- &respErr{err: history.apply(&Event{Type: Merge, Merge: t})}
+					v.resp.Send(&respErr{err: history.apply(&Event{Type: Merge, Merge: t})})
 				}
 			case *reqPrune:
 				{
 					history = newHistory(history.latest(), shortener, false)
-					v.resp <- noErr
+					v.resp.Send(noErr)
 				}
 			case *SetInfo:
 				{
-					v.resp <- &respErr{err: history.apply(&Event{Type: Set, Set: t})}
+					v.resp.Send(&respErr{err: history.apply(&Event{Type: Set, Set: t})})
 				}
 			case *reqSnap:
 				{
-					v.resp <- history.latestWithCopy(false)
+					v.resp.Send(history.latestWithCopy(false))
 				}
 			case *reqSnapShortenedIdentifiers:
 				{
-					v.resp <- history.latestWithCopy(true)
+					v.resp.Send(history.latestWithCopy(true))
 				}
 			case *reqTick:
 				{
 					if len(t.id) == 0 {
-						v.resp <- &respErr{err: errClockIdMustNotBeEmptyString}
+						v.resp.Send(&respErr{err: errClockIdMustNotBeEmptyString})
 					} else {
-						v.resp <- &respErr{err: history.apply(&Event{Type: Tick, Tick: t.id})}
+						v.resp.Send(&respErr{err: history.apply(&Event{Type: Tick, Tick: t.id})})
 					}
 				}
 			default:
-				v.resp <- &respErr{err: errUnknownReqType}
+				v.resp.Send(&respErr{err: errUnknownReqType})
 			}
 		}
+
+		// Signal ready
+		waiter <- true
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case r := <-v.req:
+			case r := <-v.req.RawChan():
 				processRequest(r)
 			}
 		}
 
 	}()
+
+	// Wait until ready
+	<-waiter
+	close(waiter)
 
 	return v, nil
 }
