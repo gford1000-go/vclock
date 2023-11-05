@@ -208,6 +208,7 @@ func (vc *VClock) Prune() error {
 }
 
 type clockSerialisation struct {
+	B []byte
 	C Clock
 	S string
 }
@@ -220,16 +221,26 @@ func (vc *VClock) Bytes() ([]byte, error) {
 		return nil, err
 	}
 
-	b := new(bytes.Buffer)
-	enc := gob.NewEncoder(b)
+	shortener, err := GetShortenerFactory().Get(vc.shortener)
+	if err != nil {
+		return nil, err
+	}
+	b, err := shortener.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
 	if err := enc.Encode(
 		&clockSerialisation{
+			B: b,
 			C: m,
 			S: vc.shortener,
 		}); err != nil {
 		return nil, err
 	}
-	return b.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // FromBytesWithHistory decodes a vector clock and preserves history from this point forwards.  This requires both
@@ -258,26 +269,38 @@ func fromBytes(context context.Context, data []byte, maintainHistory bool, short
 		return nil, err
 	}
 
+	// Retriever the desired shortener
 	if shortenerName == "" {
 		shortenerName = getDefaultShortenerName()
+	}
+	sourceShortener, err := GetShortenerFactory().Get(cs.S)
+	if err != nil {
+		return nil, err
 	}
 
 	// As the Clock was serialised using shortened identifiers,
 	// if the preferred shortener name differs from that used by the serialising
 	// clock, then need to recover to the unshortened identifiers
 	if cs.S != shortenerName {
-		shortener, err := GetShortenerFactory().Get(cs.S)
-		if err != nil {
-			return nil, err
-		}
 		newC := Clock{}
 		for k, v := range cs.C {
-			newC[shortener.Recover(k)] = v
+			newC[sourceShortener.Recover(k)] = v
 		}
 
 		return newClock(context, newC, maintainHistory, shortenerName, true)
 	}
 
+	// The two clocks are using the same shortener, we now need to ensure the shortener
+	// instance in this process has the same set of mappings as the source of the
+	// process whose clock is being merged.
+	err = sourceShortener.Merge(cs.B)
+	if err != nil {
+		return nil, err
+	}
+
+	// The new clock can be created successfully, since the shortener now
+	// has all necessary mappings to be able to fully recover the original identifiers
+	// for all entries in the clock, without needing a central service.
 	return newClock(context, cs.C, maintainHistory, shortenerName, false)
 }
 
