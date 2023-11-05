@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 
+	"github.com/gford1000-go/chant"
 	"github.com/gford1000-go/syncmap"
 )
 
@@ -21,10 +22,10 @@ type AllowedResp interface {
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
-func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c *Channel[any], t T, r *Channel[any], recoverErr error) (u U, err error) {
+func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c *chant.Channel[any], t T, r *chant.Channel[any], recoverErr error) (u U, err error) {
 	handleChanErr := func(e error) (U, error) {
 		var u U
-		if !errors.Is(e, ErrChannelClosed) {
+		if !errors.Is(e, chant.ErrChannelClosed) {
 			return u, e
 		}
 		return u, recoverErr
@@ -41,7 +42,7 @@ func attemptSendChanWithResp[T AllowedReq, U AllowedResp](c *Channel[any], t T, 
 }
 
 // attemptSendChan is syntax sugar to simply the call when only an error would be returned
-func attemptSendChan[T AllowedReq](c *Channel[any], t T, r *Channel[any], recoverErr error) error {
+func attemptSendChan[T AllowedReq](c *chant.Channel[any], t T, r *chant.Channel[any], recoverErr error) error {
 	resp, err := attemptSendChanWithResp[T, *respErr](c, t, r, recoverErr)
 	if err != nil {
 		return err
@@ -99,8 +100,8 @@ var errUnknownReqType = errors.New("received unknown request struct")
 // VClock is an instance of a vector clock that can suppport
 // concurrent use across multiple goroutines
 type VClock struct {
-	req       *Channel[any]
-	resp      *Channel[any]
+	req       *chant.Channel[any]
+	resp      *chant.Channel[any]
 	shortener string
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -338,8 +339,8 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 	ctx, cancel := context.WithCancel(ctx)
 
 	v := &VClock{
-		req:       NewChannel[any](),
-		resp:      NewChannel[any](),
+		req:       chant.New[any](),
+		resp:      chant.New[any](),
 		shortener: shortenerName,
 		ctx:       ctx,
 		cancel:    cancel,
