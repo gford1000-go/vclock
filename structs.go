@@ -125,16 +125,21 @@ func (h *HistoryItem) copy() *HistoryItem {
 
 // copyWithKeyModification returns a deep copy of the instance,
 // where keys in the Clock are adjusted by the function supplied.
-func (h *HistoryItem) copyWithKeyModification(f func(string) string) *HistoryItem {
+func (h *HistoryItem) copyWithKeyModification(f func(string) (string, error)) (*HistoryItem, error) {
+	m, err := copyMapWithKeyModification(h.Clock, f)
+	if err != nil {
+		return nil, err
+	}
+
 	hi := &HistoryItem{
 		HistoryId: h.HistoryId,
-		Clock:     copyMapWithKeyModification(h.Clock, f),
+		Clock:     m,
 	}
 
 	if h.Change != nil {
 		hi.Change = h.Change.copy()
 	}
-	return hi
+	return hi, nil
 }
 
 func (h *HistoryItem) String() string {

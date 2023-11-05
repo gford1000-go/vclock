@@ -654,7 +654,10 @@ func TestLastUpdate(t *testing.T) {
 
 	last := func(vc1 *VClock, expectedId string, expectedVal uint64) {
 
-		id, val := vc1.LastUpdate()
+		id, val, err := vc1.LastUpdate()
+		if err != nil {
+			t.Fatalf("unexpected error: %v\n", err)
+		}
 		if id != expectedId {
 			t.Fatalf("unexpected error - expected %q, got %q\n", expectedId, id)
 		}
@@ -682,9 +685,12 @@ func TestLastUpdateClosed(t *testing.T) {
 	// goroutine to execute so that the vector clock is actually closed
 	time.Sleep(1 * time.Millisecond)
 
-	last := func(vc1 *VClock, expectedId string, expectedVal uint64) {
+	last := func(vc1 *VClock, expectedId string, expectedVal uint64, expectedErr error) {
 
-		id, val := vc1.LastUpdate()
+		id, val, err := vc1.LastUpdate()
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if id != expectedId {
 			t.Fatalf("unexpected error - expected %q, got %q\n", expectedId, id)
 		}
@@ -693,7 +699,7 @@ func TestLastUpdateClosed(t *testing.T) {
 		}
 	}
 
-	last(v1, "", 0)
+	last(v1, "", 0, errClosedVClock)
 }
 
 func TestEqualSame(t *testing.T) {

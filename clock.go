@@ -18,7 +18,7 @@ type AllowedReq interface {
 }
 
 type AllowedResp interface {
-	Clock | []Clock | *respErr | bool | *respGetter | *respGetterWithStatus | []*HistoryItem
+	*respClock | *respErr | bool | *respGetter | *respGetterWithStatus | *respHistory | *respHistoryAll
 }
 
 // attemptSendChanWithResp will stop the panic and return recoverErr, should the chan be closed
@@ -76,6 +76,11 @@ type reqTick struct {
 	id string
 }
 
+type respClock struct {
+	c Clock
+	e error
+}
+
 type respErr struct {
 	err error
 }
@@ -83,11 +88,22 @@ type respErr struct {
 type respGetter struct {
 	id string
 	v  uint64
+	e  error
 }
 
 type respGetterWithStatus struct {
 	respGetter
 	b bool
+}
+
+type respHistory struct {
+	h []Clock
+	e error
+}
+
+type respHistoryAll struct {
+	h []*HistoryItem
+	e error
 }
 
 var errClockIdMustNotBeEmptyString = errors.New("clock identifier must not be empty string")
@@ -154,18 +170,39 @@ func (vc *VClock) Get(id string) (uint64, bool) {
 
 // GetClock returns a copy of the complete vector clock map
 func (vc *VClock) GetClock() (Clock, error) {
-	return attemptSendChanWithResp[*reqSnap, Clock](vc.req, &reqSnap{}, vc.resp, errClosedVClock)
+	resp, err := attemptSendChanWithResp[*reqSnap, *respClock](vc.req, &reqSnap{}, vc.resp, errClosedVClock)
+	if err != nil {
+		return nil, err
+	}
+	if resp.e != nil {
+		return nil, resp.e
+	}
+	return resp.c, nil
 }
 
 // GetFullHistory returns a copy of each state change of the vectory clock map,
 // including the Event detail of the change as well as new state of the clock
 func (vc *VClock) GetFullHistory() ([]*HistoryItem, error) {
-	return attemptSendChanWithResp[*reqFullHistory, []*HistoryItem](vc.req, &reqFullHistory{}, vc.resp, errClosedVClock)
+	resp, err := attemptSendChanWithResp[*reqFullHistory, *respHistoryAll](vc.req, &reqFullHistory{}, vc.resp, errClosedVClock)
+	if err != nil {
+		return nil, err
+	}
+	if resp.e != nil {
+		return nil, resp.e
+	}
+	return resp.h, nil
 }
 
 // GetHistory returns a copy of each state change of the vector clock map
 func (vc *VClock) GetHistory() ([]Clock, error) {
-	return attemptSendChanWithResp[*reqHistory, []Clock](vc.req, &reqHistory{}, vc.resp, errClosedVClock)
+	resp, err := attemptSendChanWithResp[*reqHistory, *respHistory](vc.req, &reqHistory{}, vc.resp, errClosedVClock)
+	if err != nil {
+		return nil, err
+	}
+	if resp.e != nil {
+		return nil, resp.e
+	}
+	return resp.h, nil
 }
 
 // Copy creates a new VClock instance, initialised to the
@@ -179,12 +216,15 @@ func (vc *VClock) Copy() (*VClock, error) {
 }
 
 // LastUpdate returns the latest clock time and its associated identifier
-func (vc *VClock) LastUpdate() (id string, last uint64) {
+func (vc *VClock) LastUpdate() (string, uint64, error) {
 	g, err := attemptSendChanWithResp[*reqLastUpdate, *respGetter](vc.req, &reqLastUpdate{}, vc.resp, errClosedVClock)
 	if err != nil {
-		return "", 0
+		return "", 0, err
 	}
-	return g.id, g.v
+	if g.e != nil {
+		return "", 0, g.e
+	}
+	return g.id, g.v, nil
 }
 
 // Merge combines this clock with the other clock.  The other clock
@@ -216,9 +256,12 @@ type clockSerialisation struct {
 // Bytes returns an encoded vector clock
 func (vc *VClock) Bytes() ([]byte, error) {
 
-	m, err := attemptSendChanWithResp[*reqSnapShortenedIdentifiers, Clock](vc.req, &reqSnapShortenedIdentifiers{}, vc.resp, errClosedVClock)
+	resp, err := attemptSendChanWithResp[*reqSnapShortenedIdentifiers, *respClock](vc.req, &reqSnapShortenedIdentifiers{}, vc.resp, errClosedVClock)
 	if err != nil {
 		return nil, err
+	}
+	if resp.e != nil {
+		return nil, resp.e
 	}
 
 	shortener, err := GetShortenerFactory().Get(vc.shortener)
@@ -235,7 +278,7 @@ func (vc *VClock) Bytes() ([]byte, error) {
 	if err := enc.Encode(
 		&clockSerialisation{
 			B: b,
-			C: m,
+			C: resp.c,
 			S: vc.shortener,
 		}); err != nil {
 		return nil, err
@@ -284,7 +327,11 @@ func fromBytes(context context.Context, data []byte, maintainHistory bool, short
 	if cs.S != shortenerName {
 		newC := Clock{}
 		for k, v := range cs.C {
-			newC[sourceShortener.Recover(k)] = v
+			kk, err := sourceShortener.Recover(k)
+			if err != nil {
+				return nil, err
+			}
+			newC[kk] = v
 		}
 
 		return newClock(context, newC, maintainHistory, shortenerName, true)
@@ -405,12 +452,14 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 			switch t := r.(type) {
 			case *respComp:
 				{
-					c := copyMapWithKeyModification(t.other, shortener.Shorten)
+					f := func(s string) (string, error) { return shortener.Shorten(s), nil }
+					c, _ := copyMapWithKeyModification(t.other, f)
 					v.resp.Send(compare(history.latest(), c, t.cond))
 				}
 			case *reqFullHistory:
 				{
-					v.resp.Send(history.getFullAll())
+					h, err := history.getFullAll()
+					v.resp.Send(&respHistoryAll{h: h, e: err})
 				}
 			case *reqGet:
 				{
@@ -424,7 +473,8 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 				}
 			case *reqHistory:
 				{
-					v.resp.Send(history.getAll())
+					h, err := history.getAll()
+					v.resp.Send(&respHistory{h: h, e: err})
 				}
 			case *reqLastUpdate:
 				{
@@ -438,7 +488,8 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 							last = vc[key]
 						}
 					}
-					v.resp.Send(&respGetter{id: shortener.Recover(id), v: last})
+					id, err := shortener.Recover(id)
+					v.resp.Send(&respGetter{id: id, v: last, e: err})
 				}
 			case Clock:
 				{
@@ -455,11 +506,13 @@ func newClock(ctx context.Context, init Clock, maintainHistory bool, shortenerNa
 				}
 			case *reqSnap:
 				{
-					v.resp.Send(history.latestWithCopy(false))
+					c, err := history.latestWithCopy(false)
+					v.resp.Send(&respClock{c: c, e: err})
 				}
 			case *reqSnapShortenedIdentifiers:
 				{
-					v.resp.Send(history.latestWithCopy(true))
+					c, err := history.latestWithCopy(true)
+					v.resp.Send(&respClock{c: c, e: err})
 				}
 			case *reqTick:
 				{

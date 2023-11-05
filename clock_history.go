@@ -10,12 +10,16 @@ func copyMap[T comparable, U any](m map[T]U) map[T]U {
 }
 
 // copyMapWithKeyModification applies the function to the key as it is copied
-func copyMapWithKeyModification[T comparable, U any](m map[T]U, f func(T) T) map[T]U {
+func copyMapWithKeyModification[T comparable, U any](m map[T]U, f func(T) (T, error)) (map[T]U, error) {
 	newm := map[T]U{}
 	for k, v := range m {
-		newm[f(k)] = v
+		kk, err := f(k)
+		if err != nil {
+			return nil, err
+		}
+		newm[kk] = v
 	}
-	return newm
+	return newm, nil
 }
 
 // history records all historic events (subject to pruning)
@@ -29,7 +33,11 @@ type history struct {
 
 // apply attempts to extend the history by applying the event
 func (h *history) apply(event *Event) error {
-	vc := h.latestWithCopy(true)
+	vc, err := h.latestWithCopy(true)
+	if err != nil {
+		return err
+	}
+
 	if err := event.apply(vc, h.shortener.Shorten); err != nil {
 		return err
 	}
@@ -55,9 +63,9 @@ func (h *history) latest() Clock {
 
 // latestWithCopy returns a copy of the current clock value,
 // with either shortened or full identifiers
-func (h *history) latestWithCopy(useExistingIdentifiers bool) Clock {
+func (h *history) latestWithCopy(useExistingIdentifiers bool) (Clock, error) {
 	if useExistingIdentifiers {
-		return copyMap(h.latest())
+		return copyMap(h.latest()), nil
 	}
 	return copyMapWithKeyModification[string, uint64](h.latest(), h.shortener.Recover)
 }
@@ -68,7 +76,7 @@ func (h *history) getLastId() uint64 {
 }
 
 // getRange returns the specified range of history
-func (h *history) getRange(from, to uint64, useShortened bool) []Clock {
+func (h *history) getRange(from, to uint64, useShortened bool) ([]Clock, error) {
 	if from > to {
 		return h.getRange(to, from, useShortened)
 	}
@@ -78,21 +86,25 @@ func (h *history) getRange(from, to uint64, useShortened bool) []Clock {
 			if useShortened {
 				ret = append(ret, copyMap(h.items[i].Clock))
 			} else {
-				ret = append(ret, copyMapWithKeyModification(h.items[i].Clock, h.shortener.Recover))
+				m, err := copyMapWithKeyModification(h.items[i].Clock, h.shortener.Recover)
+				if err != nil {
+					return nil, err
+				}
+				ret = append(ret, m)
 			}
 		}
 	}
-	return ret
+	return ret, nil
 }
 
 // getAll returns all of the history using the
 // fully expanded identifiers
-func (h *history) getAll() []Clock {
+func (h *history) getAll() ([]Clock, error) {
 	return h.getRange(0, h.getLastId(), false)
 }
 
 // getFullRange returns the specified range of history
-func (h *history) getFullRange(from, to uint64, useShortened bool) []*HistoryItem {
+func (h *history) getFullRange(from, to uint64, useShortened bool) ([]*HistoryItem, error) {
 	if from > to {
 		return h.getFullRange(to, from, useShortened)
 	}
@@ -102,16 +114,20 @@ func (h *history) getFullRange(from, to uint64, useShortened bool) []*HistoryIte
 			if useShortened {
 				ret = append(ret, h.items[i].copy())
 			} else {
-				ret = append(ret, h.items[i].copyWithKeyModification(h.shortener.Recover))
+				item, err := h.items[i].copyWithKeyModification(h.shortener.Recover)
+				if err != nil {
+					return nil, err
+				}
+				ret = append(ret, item)
 			}
 		}
 	}
-	return ret
+	return ret, nil
 }
 
 // getFullAll returns all of the history using the
 // fully expanded identifiers
-func (h *history) getFullAll() []*HistoryItem {
+func (h *history) getFullAll() ([]*HistoryItem, error) {
 	return h.getFullRange(0, h.getLastId(), false)
 }
 
@@ -125,7 +141,8 @@ func newHistory(m Clock, shortener IdentifierShortener, applyShortener bool) *hi
 
 	var c Clock
 	if applyShortener {
-		c = copyMapWithKeyModification(m, shortener.Shorten)
+		f := func(s string) (string, error) { return shortener.Shorten(s), nil }
+		c, _ = copyMapWithKeyModification(m, f)
 	} else {
 		c = copyMap(m)
 	}

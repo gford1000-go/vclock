@@ -14,11 +14,11 @@ type ShortenedMap map[string]string
 // IdentifierShortener provides functions to shorten vector clock
 // identifiers to minimise the overall memory footprint of the clock.
 type IdentifierShortener interface {
-	Name() string            // Name of the shortener - msut be unique
-	Shorten(s string) string // Returns the shortened version of the supplied string
-	Recover(s string) string // Recovers the original string from the shortened version
-	Bytes() ([]byte, error)  // The full map of shortened strings to original strings as a serialised ShortenedMap
-	Merge(b []byte) error    // Merge the contents of the ShortenedMap into the instance
+	Name() string                     // Name of the shortener - msut be unique
+	Shorten(s string) string          // Returns the shortened version of the supplied string
+	Recover(s string) (string, error) // Recovers the original string from the shortened version
+	Bytes() ([]byte, error)           // The full map of shortened strings to original strings as a serialised ShortenedMap
+	Merge(b []byte) error             // Merge the contents of the ShortenedMap into the instance
 }
 
 // Shortener is the function that applies the transformation
@@ -27,6 +27,7 @@ type Shortener func(string) string
 var errShortenerIsNil = errors.New("shortener must not be nil")
 var errShortenerNameIsNil = errors.New("shortener name must be non-empty string")
 var errSerialiseNameMismatch = errors.New("shortener name mismatch - deserialisation not possible")
+var errShortenedIdentifierNotFound = errors.New("shortener name not found")
 
 // NewInMemoryShortener creates an instance of InMemoryShortener that will
 // use the specified Shortener
@@ -64,11 +65,11 @@ func (h *InMemoryShortener) Shorten(s string) string {
 	return k
 }
 
-func (h *InMemoryShortener) Recover(s string) string {
+func (h *InMemoryShortener) Recover(s string) (string, error) {
 	if ss, err := h.sm.Get(s); err != nil {
-		return ""
+		return "", errShortenedIdentifierNotFound
 	} else {
-		return ss
+		return ss, nil
 	}
 }
 
