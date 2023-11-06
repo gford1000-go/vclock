@@ -3,6 +3,7 @@ package vclock
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -48,42 +49,122 @@ func ExampleNewShowingTick() {
 		vc *VClock
 	}
 
-	// Transmit is the sending and receipt of an event between processes
-	transfer := func(from, to *process) {
-
-		// Emulates sending a vector clock as part of an event moving between processes
-		send := func(from *process) []byte {
-			from.vc.Tick(from.id)
-			b, _ := from.vc.Bytes()
-			return b
-		}
-
-		// Emulates receiving a vector clock as part of an event moving between processes
-		recv := func(to *process, b []byte) {
-			to.vc.Tick(to.id)
-			vc, _ := FromBytes(ctx, b, "")
-			to.vc.Merge(vc)
-		}
-
-		// Perform the transfer
-		recv(to, send(from))
-	}
-
 	// The three processes of the example
 	var A *process = &process{id: "a", vc: newF(Clock{"a": 0})}
 	var B *process = &process{id: "b", vc: newF(Clock{"b": 0})}
 	var C *process = &process{id: "c", vc: newF(Clock{"c": 0})}
 
-	// This is the event sequence of the example
-	transfer(C, B)
-	transfer(B, A)
-	transfer(B, C)
-	transfer(A, B)
-	transfer(C, A)
-	transfer(B, C)
-	transfer(C, A)
+	// notification transfers the clock and then sequentially handles the next notifications
+	type notification struct {
+		from *process
+		to   *process
+		next []*notification
+	}
 
+	// This is the event sequence of the example
+	n := &notification{
+		from: C,
+		to:   B,
+		next: []*notification{
+			{
+				from: B,
+				to:   A,
+				next: []*notification{
+					{
+						from: A,
+						to:   B,
+						next: []*notification{
+							{
+								from: B,
+								to:   C,
+								next: []*notification{
+									{
+										from: C,
+										to:   A,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				from: B,
+				to:   C,
+				next: []*notification{
+					{
+						from: C,
+						to:   A,
+					},
+				},
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+
+	// sleep emulates real-world transfer wait periods
+	sleep := func() time.Duration { return time.Duration(rand.Intn(50)) * time.Millisecond }
+
+	// simRecursive type allows our inline func to work
+	type simRecursive func(*notification, simRecursive)
+
+	// runSim ensures that the WaitGroup is incremented prior to
+	// starting a goroutine with the f()
+	runSim := func(n *notification, f simRecursive) {
+		wg.Add(1)
+		go f(n, f)
+	}
+
+	// simulator is a recursive processor of the supplied notification instance
+	simulator := func(n *notification, f simRecursive) {
+		defer wg.Done()
+
+		// Transmit is the sending and receipt of an event between processes
+		transfer := func(from, to *process) {
+
+			// Emulates sending a vector clock as part of an event moving between processes
+			send := func(from *process) []byte {
+				from.vc.Tick(from.id)
+				b, _ := from.vc.Bytes()
+				return b
+			}
+
+			// Emulates receiving a vector clock as part of an event moving between processes
+			recv := func(to *process, b []byte) {
+				to.vc.Tick(to.id)
+				vc, _ := FromBytes(ctx, b, "")
+				to.vc.Merge(vc)
+			}
+
+			// Perform the transfer
+			recv(to, send(from))
+		}
+
+		// Random pause
+		d := sleep()
+		if d > 0 {
+			time.Sleep(d)
+		}
+
+		// Transfer the VClock
+		transfer(n.from, n.to)
+
+		// Process any next notifications
+		for _, nn := range n.next {
+			runSim(nn, f)
+		}
+	}
+
+	// Start the simulation
+	runSim(n, simulator)
+
+	// Wait for all transfers to complete
+	wg.Wait()
+
+	// Retrieve the Clock and see what we have
 	a, _ := A.vc.GetClock()
+
 	fmt.Println(a)
 	// Output: map[a:4 b:5 c:5]
 }
