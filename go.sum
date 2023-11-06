@@ -1,5 +1,7 @@
 github.com/gford1000-go/chant v0.0.0-20231104200337-4193019bfae5 h1:s+wgPzYHHjumEAugeTPDVIIQ9j6UYrOYLkALPUulBlU=
 github.com/gford1000-go/chant v0.0.0-20231104200337-4193019bfae5/go.mod h1:N3Bqxng91jfYqYsPYGJukDKQSrTTAvAtklwTjBXbmfA=
+github.com/gford1000-go/chant v1.0.0 h1:RrHlTiBMKTJPr0SCBkwnE4532qy8r5txy4E8mPOc5pg=
+github.com/gford1000-go/chant v1.0.0/go.mod h1:N3Bqxng91jfYqYsPYGJukDKQSrTTAvAtklwTjBXbmfA=
 github.com/gford1000-go/syncmap v1.0.0 h1:UrMGj6rioTIpp6HW8LxS3hTLjm9sdjusAdK+tl3t6Sc=
 github.com/gford1000-go/syncmap v1.0.0/go.mod h1:MASFrhePypaEVNCBevXoNfIOFaBHJRJ87yXnwpnqsk4=
 golang.org/x/exp v0.0.0-20231006140011-7918f672742d h1:jtJma62tbqLibJ5sFQz8bKtEM8rJBtfilJ2qTU199MI=
